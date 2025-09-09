@@ -4,7 +4,14 @@ Comprehensive set of DOM manipulation, data extraction utilities, and various ca
 
 ## Updating the package
 
-Make your changes then, depending on the changes:
+Make your changes then:
+
+```bash
+npm run build
+npm test
+```
+
+and then, depending on the changes:
 
 For bug fixes (backward compatible):
 
