@@ -5,10 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "exports": {
-    ".": "./dist/index.js",
-    "./financial": "./dist/financial/index.js",
-    "./data": "./dist/data/index.js",
-    "./config": "./dist/config/index.js"
+    ".": "./dist/index.js"
   },
   "files": [
     "dist",
@@ -33,13 +30,6 @@
     "type": "git",
     "url": "https://applogic@gitlab.com/archerjessop/utilities.git"
   },
-  "keywords": [
-    "finance",
-    "real-estate",
-    "calculations",
-    "property-analysis",
-    "utilities"
-  ],
   "author": "ArcherJessop",
   "license": "MIT",
   "devDependencies": {
