@@ -18,3 +18,24 @@ export function calculatePMT(principal, annualRate, years) {
               (Math.pow(1 + monthlyRate, numPayments) - 1);
   return pmt;
 }
+
+export function calculateCOCR30(askingPrice, noi) {
+  try {
+    const cashInvested = askingPrice * 0.30; // 30% down payment
+    const dscrLoanAmount = askingPrice * 0.70; // Fixed 70% DSCR loan
+    const dscrPayment = calculatePMT(dscrLoanAmount, 0.075, 30) * 12; // Annual DSCR payment
+    const annualCashFlow = noi - dscrPayment;
+    const cocr = (annualCashFlow / cashInvested) * 100;
+    
+    return cocr;
+  } catch (error) {
+    return 0;
+  }
+}
+
+export function calculateCashFlowYield(monthlyCashFlow, purchasePrice) {
+  if (!purchasePrice || purchasePrice <= 0) return 0;
+  const annualCashFlow = monthlyCashFlow * 12;
+  return (annualCashFlow / purchasePrice) * 100;
+}
+
