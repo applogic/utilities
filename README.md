@@ -2,7 +2,7 @@
 
 Comprehensive set of DOM manipulation, data extraction utilities, and various calculations (financial and otherwise) for our web applications.
 
-## Updating
+## Updating the package
 
 Make your changes then, depending on the changes:
 
