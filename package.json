@@ -1,0 +1,53 @@
+{
+  "name": "@archerjessop/utilities",
+  "version": "1.0.0",
+  "description": "Shared utilities for ArcherJessop property analysis tools",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./financial": "./dist/financial/index.js",
+    "./data": "./dist/data/index.js",
+    "./config": "./dist/config/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build && npm run test",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://applogic@gitlab.com/archerjessop/utilities.git"
+  },
+  "keywords": [
+    "finance",
+    "real-estate",
+    "calculations",
+    "property-analysis",
+    "utilities"
+  ],
+  "author": "ArcherJessop",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "rollup": "^4.9.6"
+  },
+  "dependencies": {}
+}
