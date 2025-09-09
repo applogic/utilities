@@ -1,5 +1,7 @@
 // Jest setup file for @archerjessop/utilities tests
 
+import { expect } from 'vitest';
+
 // Custom matchers for financial calculations
 expect.extend({
   toBeWithinRange(received, floor, ceiling) {
