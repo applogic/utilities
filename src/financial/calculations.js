@@ -178,27 +178,6 @@ export function calculateNOIByType(askingPrice, capRate, propertyType = PROPERTY
   }
 }
 
-
-
-
-  async function calculateNOIByType(askingPrice, capRate, propertyType, address) {
-    switch (propertyType) {
-      case "str":
-        const strNOI = await calculateSTRNOI(address);
-        return strNOI || (askingPrice * capRate);
-        
-      case "assisted":
-        const bedrooms = extractBedrooms();
-        return bedrooms * PROPERTY_TYPES.ASSISTED_LIVING.INCOME_PER_BEDROOM_MONTHLY * 12;
-        
-      case "multifamily":
-      default:
-        return askingPrice * capRate;
-    }
-  }
-
-  
-
 /**
  * Calculate assignment fee
  * @param {number} askingPrice - Property asking price
