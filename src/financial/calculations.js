@@ -219,3 +219,110 @@ export function calculateNetToBuyer(askingPrice, options = {}) {
     return 0;
   }
 }
+
+/**
+ * Calculate remaining loan balance at end of balloon period
+ * @param {number} loanAmount - Initial loan amount
+ * @param {number} interestRate - Annual interest rate as decimal (e.g., 0.075 for 7.5%)
+ * @param {number} amortizationYears - Full amortization period in years
+ * @param {number} balloonYears - Balloon period in years
+ * @returns {number} Remaining balance at end of balloon period
+ */
+export function calculateBalloonBalance(loanAmount, interestRate, amortizationYears, balloonYears = FINANCIAL_CONSTANTS.DEFAULT_BALLOON_PERIOD_YEARS) {
+  try {
+    if (loanAmount <= 0 || interestRate < 0 || amortizationYears <= 0 || balloonYears <= 0) {
+      return 0;
+    }
+
+    // If balloon period equals or exceeds amortization, loan is fully paid
+    if (balloonYears >= amortizationYears) {
+      return 0;
+    }
+
+    // Special handling for zero interest rate (simple linear paydown)
+    if (interestRate === 0) {
+      const totalPayments = amortizationYears * 12;
+      const paymentsMade = balloonYears * 12;
+      return loanAmount * (totalPayments - paymentsMade) / totalPayments;
+    }
+
+    const monthlyRate = interestRate / 12;
+    const totalPayments = amortizationYears * 12;
+    const balloonPayments = balloonYears * 12;
+
+    // Calculate remaining balance using loan balance formula
+    // Balance = P * [(1 + r)^n - (1 + r)^p] / [(1 + r)^n - 1]
+    // Where P = principal, r = monthly rate, n = total payments, p = payments made
+    
+    const factor1 = Math.pow(1 + monthlyRate, totalPayments);
+    const factor2 = Math.pow(1 + monthlyRate, balloonPayments);
+    
+    const remainingBalance = loanAmount * (factor1 - factor2) / (factor1 - 1);
+    
+    return Math.max(0, remainingBalance); // Ensure non-negative
+  } catch (error) {
+    return 0;
+  }
+}
+
+/**
+ * Calculate property value after appreciation period
+ * @param {number} currentValue - Current property value
+ * @param {number} appreciationRate - Annual appreciation rate as decimal
+ * @param {number} years - Number of years
+ * @returns {number} Appreciated property value
+ */
+export function calculateAppreciatedValue(currentValue, appreciationRate = FINANCIAL_CONSTANTS.APPRECIATION_RATE, years = FINANCIAL_CONSTANTS.DEFAULT_BALLOON_PERIOD_YEARS) {
+  try {
+    if (currentValue <= 0 || appreciationRate < 0 || years < 0) {
+      return currentValue;
+    }
+    
+    return currentValue * Math.pow(1 + appreciationRate, years);
+  } catch (error) {
+    return currentValue;
+  }
+}
+
+/**
+ * Calculate cash out amount after appreciation refinance
+ * @param {number} originalPrice - Original purchase price
+ * @param {number} dscrLoanAmount - Original DSCR loan amount  
+ * @param {number} sellerFiAmount - Original seller financing amount
+ * @param {Object} options - Configuration options
+ * @returns {number} Cash out amount (positive = cash out, negative = cash in)
+ */
+export function calculateCashOutAfterRefi(originalPrice, dscrLoanAmount, sellerFiAmount, options = {}) {
+  const {
+    appreciationRate = FINANCIAL_CONSTANTS.APPRECIATION_RATE,
+    balloonYears = FINANCIAL_CONSTANTS.DEFAULT_BALLOON_PERIOD_YEARS,
+    dscrRate = FINANCIAL_CONSTANTS.DSCR_INTEREST_RATE,
+    dscrTerm = FINANCIAL_CONSTANTS.DSCR_AMORTIZATION,
+    sellerFiTerm = FINANCIAL_CONSTANTS.SELLER_FI_AMORTIZATION,
+    refiLtvPercent = 70 // 70% LTV on refi
+  } = options;
+
+  try {
+    // Calculate appreciated property value
+    const appreciatedValue = calculateAppreciatedValue(originalPrice, appreciationRate, balloonYears);
+    
+    // Calculate remaining balance on DSCR loan
+    const dscrRemainingBalance = calculateBalloonBalance(dscrLoanAmount, dscrRate, dscrTerm, balloonYears);
+    
+    // Calculate remaining balance on seller financing (0% interest)
+    const sellerFiRemainingBalance = calculateBalloonBalance(sellerFiAmount, FINANCIAL_CONSTANTS.SELLER_FI_INTEREST_RATE, sellerFiTerm, balloonYears);
+    
+    // Total remaining debt
+    const totalRemainingDebt = dscrRemainingBalance + sellerFiRemainingBalance;
+    
+    // Calculate new loan amount at 70% LTV of appreciated value
+    const newLoanAmount = appreciatedValue * (refiLtvPercent / 100);
+    
+    // Cash out = new loan - total remaining debt
+    const cashOut = newLoanAmount - totalRemainingDebt;
+    
+    return cashOut;
+  } catch (error) {
+    return 0;
+  }
+}
