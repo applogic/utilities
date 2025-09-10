@@ -5,6 +5,6 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['tests/setup.js'],
     globals: true,
-    include: ['tests/financial/calculations.test.js']
+    include: ["tests/financial/calculations.test.js", "tests/config/*.test.js"]
   }
 });

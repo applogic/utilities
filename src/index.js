@@ -14,3 +14,8 @@ export { extractPhoneNumber, extractBedrooms } from "./data/extractors.js";
 
 // Date utilities
 export { calculateDOM } from "./date/utilities.js";
+
+// Configuration constants
+export * from './config/financial.js';
+export * from './config/property-types.js';
+export * from './config/business.js';
