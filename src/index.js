@@ -4,7 +4,16 @@
  */
 
 // Financial calculations
-export { calculatePMT, calculateCOCR30, calculateCashFlowYield } from "./financial/calculations.js";
+export { 
+  calculatePMT, 
+  calculateCOCR30, 
+  calculateCashFlowYield,
+  calculatePriceForCOCR,
+  calculateCOCRAtPercent,
+  calculateNOIByType,
+  calculateAssignmentFee,
+  calculateNetToBuyer
+ } from "./financial/calculations.js";
 
 // Financial formatters
 export { formatCurrency, formatPriceValue, formatPercentage } from "./financial/formatters.js";

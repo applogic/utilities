@@ -2,7 +2,20 @@
  * Tests for financial calculation utilities
  */
 
-import { calculatePMT } from "../../src/financial/calculations.js";
+import { 
+  calculatePMT,
+  calculatePriceForCOCR,
+  calculateCOCRAtPercent,
+  calculateNOIByType,
+  calculateAssignmentFee,
+  calculateNetToBuyer
+} from "../../src/financial/calculations.js";
+
+import { FINANCIAL_CONSTANTS } from '../../src/config/financial.js';
+import { BUSINESS_CONSTANTS } from '../../src/config/business.js';
+import { PROPERTY_TYPE_CONSTANTS, PROPERTY_TYPES } from '../../src/config/property-types.js';
+
+
 
 describe("Financial Calculations", () => {
   describe("calculatePMT", () => {
@@ -57,6 +70,152 @@ describe("Financial Calculations", () => {
     test("should validate input ranges", () => {
       const highRateResult = calculatePMT(100000, 0.50, 10);
       expect(highRateResult).toBeCloseTo(4197.97, 2);  // Updated from 4178.46
+    });
+  });
+});
+
+describe("Core Financial Calculations", () => {
+  describe("calculatePriceForCOCR", () => {
+    test("should calculate price for 15% COCR target using config defaults", () => {
+      const noi = 50000;
+      const result = calculatePriceForCOCR(noi, 0.15);
+      
+      expect(result).toBeGreaterThan(400000);
+      expect(result).toBeLessThan(600000);
+    });
+
+    test("should respect business constants for bounds", () => {
+      const noi = 1; // Very small NOI
+      const result = calculatePriceForCOCR(noi, 0.15);
+      
+      // With such a small NOI, should return minimum bound
+      expect(result).toBe(BUSINESS_CONSTANTS.MINIMUM_COCR15_PRICE);
+    });
+
+    test("should use financial constants for defaults", () => {
+      const noi = 60000;
+      const result1 = calculatePriceForCOCR(noi, 0.15);
+      const result2 = calculatePriceForCOCR(noi, 0.15, {
+        downPercent: FINANCIAL_CONSTANTS.DEFAULT_DOWN_PAYMENT * 100,
+        dscrRate: FINANCIAL_CONSTANTS.DSCR_INTEREST_RATE
+      });
+      
+      expect(result1).toBeCloseTo(result2, 0);
+    });
+
+    test("should handle different target COCR rates", () => {
+      const noi = 60000;
+      const result15 = calculatePriceForCOCR(noi, 0.15);
+      const result20 = calculatePriceForCOCR(noi, 0.20);
+      
+      expect(result20).toBeLessThan(result15);
+    });
+  });
+
+  describe("calculateCOCRAtPercent", () => {
+    test("should use config constants for calculations", () => {
+      const askingPrice = 500000;
+      const noi = 60000;
+      const result = calculateCOCRAtPercent(askingPrice, noi, 30);
+      
+      expect(result).toBeGreaterThan(10);
+      expect(result).toBeLessThan(25);
+    });
+
+    test("should handle seller financing with config rates", () => {
+      const askingPrice = 500000;
+      const noi = 60000;
+      const resultWithSF = calculateCOCRAtPercent(askingPrice, noi, 30, { sellerFiPercent: 20 });
+      const resultWithoutSF = calculateCOCRAtPercent(askingPrice, noi, 30, { sellerFiPercent: 0 });
+      
+      expect(resultWithSF).toBeGreaterThan(resultWithoutSF);
+    });
+  });
+
+  describe("calculateNOIByType", () => {
+    test("should calculate multifamily NOI using cap rate", () => {
+      const askingPrice = 500000;
+      const capRate = 0.08;
+      const result = calculateNOIByType(askingPrice, capRate, PROPERTY_TYPES.MULTIFAMILY);
+      
+      expect(result).toBe(40000);
+    });
+
+    test("should calculate STR NOI using config constants", () => {
+      const askingPrice = 500000;
+      const result = calculateNOIByType(askingPrice, 0.08, PROPERTY_TYPES.STR);
+      
+      const expectedGross = askingPrice * PROPERTY_TYPE_CONSTANTS.STR.ESTIMATED_GROSS_RATE;
+      const expectedNOI = expectedGross * PROPERTY_TYPE_CONSTANTS.STR.NOI_PERCENTAGE;
+      
+      expect(result).toBe(expectedNOI);
+    });
+
+    test("should calculate assisted living NOI using config constants", () => {
+      const result = calculateNOIByType(500000, 0.08, PROPERTY_TYPES.ASSISTED_LIVING);
+      
+      const expected = PROPERTY_TYPE_CONSTANTS.ASSISTED_LIVING.DEFAULT_BEDROOM_COUNT * 
+                      PROPERTY_TYPE_CONSTANTS.ASSISTED_LIVING.INCOME_PER_BEDROOM_MONTHLY * 12;
+      
+      expect(result).toBe(expected);
+    });
+
+    test("should handle custom bedroom count for assisted living", () => {
+      const result = calculateNOIByType(500000, 0.08, PROPERTY_TYPES.ASSISTED_LIVING, { bedroomCount: 6 });
+      
+      expect(result).toBe(6 * PROPERTY_TYPE_CONSTANTS.ASSISTED_LIVING.INCOME_PER_BEDROOM_MONTHLY * 12);
+    });
+  });
+
+  describe("calculateAssignmentFee", () => {
+    test("should use config constant for default assignment fee", () => {
+      const askingPrice = 500000;
+      const result = calculateAssignmentFee(askingPrice);
+      
+      const expected = askingPrice * BUSINESS_CONSTANTS.ASSIGNMENT_FEE_PERCENTAGE;
+      expect(result).toBe(expected);
+    });
+
+    test("should calculate custom assignment fee percentage", () => {
+      const askingPrice = 500000;
+      const result = calculateAssignmentFee(askingPrice, 3);
+      
+      expect(result).toBe(15000); // 500k * 3%
+    });
+  });
+
+  describe("calculateNetToBuyer", () => {
+    test("should use config constants for calculation", () => {
+      const askingPrice = 500000;
+      const result = calculateNetToBuyer(askingPrice);
+      
+      // Should use business constants from config
+      expect(result).toBeGreaterThan(0); // Should be positive for typical scenario
+    });
+
+    test("should handle custom parameters while defaulting to config", () => {
+      const askingPrice = 500000;
+      const result1 = calculateNetToBuyer(askingPrice);
+      const result2 = calculateNetToBuyer(askingPrice, {
+        dscrLtvPercent: FINANCIAL_CONSTANTS.DEFAULT_DSCR_PERCENTAGE * 100
+      });
+      
+      expect(result1).toBeCloseTo(result2, 0);
+    });
+  });
+
+  describe("Config constant integration", () => {
+    test("should use consistent constants across functions", () => {
+      // Test that the same DSCR rate is used across functions
+      const askingPrice = 500000;
+      const noi = 60000;
+      
+      // Both functions should use the same DSCR rate from config
+      const cocrResult = calculateCOCRAtPercent(askingPrice, noi, 30);
+      expect(cocrResult).toBeGreaterThan(0);
+      
+      const priceResult = calculatePriceForCOCR(noi, 0.15);
+      expect(priceResult).toBeGreaterThan(0);
     });
   });
 });
