@@ -4,34 +4,34 @@ export const formatInputDisplay = (value, type) => {
   const hasDecimals = num % 1 !== 0;
   
   switch (type) {
-    case 'currency':
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
+    case "currency":
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
         minimumFractionDigits: hasDecimals ? 2 : 0,
         maximumFractionDigits: 2
       }).format(num);
     
-    case 'percent':
-      return new Intl.NumberFormat('en-US', {
-        minimumFractionDigits: hasDecimals ? 1 : 0,
-        maximumFractionDigits: 2
-      }).format(num) + '%';
+    case "percent":
+      return new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: hasDecimals && Math.abs(num) >= 0.1 ? 1 : hasDecimals ? 3 : 0,
+        maximumFractionDigits: Math.abs(num) < 1 ? 3 : 2
+      }).format(num) + "%";
     
-    case 'years':
-      return new Intl.NumberFormat('en-US', {
+    case "years":
+      return new Intl.NumberFormat("en-US", {
         minimumFractionDigits: hasDecimals ? 1 : 0,
         maximumFractionDigits: 1
-      }).format(num) + ' yrs.';
+      }).format(num) + " yrs.";
     
-    case 'months':
-      return new Intl.NumberFormat('en-US', {
+    case "months":
+      return new Intl.NumberFormat("en-US", {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
-      }).format(num) + ' mos.';
+      }).format(num) + " mos.";
     
-    case 'number':
-      return new Intl.NumberFormat('en-US', {
+    case "number":
+      return new Intl.NumberFormat("en-US", {
         minimumFractionDigits: hasDecimals ? 2 : 0,
         maximumFractionDigits: 2
       }).format(num);
@@ -42,7 +42,12 @@ export const formatInputDisplay = (value, type) => {
 };
 
 export const parseNumericInput = (value) => {
+  // Handle null, undefined, or non-string inputs
+  if (value === null || value === undefined) {
+    return 0;
+  }
+  
   // Remove all non-numeric characters except decimal point and negative sign
-  const cleaned = value.toString().replace(/[^0-9.-]/g, '');
+  const cleaned = value.toString().replace(/[^0-9.-]/g, "");
   return parseFloat(cleaned) || 0;
 };
