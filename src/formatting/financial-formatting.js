@@ -143,7 +143,7 @@ export const formatLiveInput = (value, type, preserveTyping = false) => {
   const filtered = filterNumericInput(value, true);
   const formatted = formatLiveNumber(filtered, type, preserveTyping);
   
-  if (!formatted) return "";
+  if (formatted === "" || formatted === null || formatted === undefined) return "";
   
   switch (type) {
     case "currency":
