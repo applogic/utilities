@@ -157,12 +157,18 @@ export const formatLiveInput = (value, type) => {
   }
 };
 
-export const calculateCursorPosition = (oldValue, newValue, oldCursor) => {
+export const calculateCursorPosition = (oldValue, newValue, oldCursor, type) => {
   if (oldCursor <= 0) return 0;
   if (oldCursor >= oldValue.length) {
-    // Cursor was at end - find the end of numeric part in new value
-    const match = newValue.match(/^[0-9,.-]+/);
-    return match ? match[0].length : 0;
+    // Cursor was at end - handle based on format type
+    if (type === "currency") {
+      // Currency: cursor can go to the very end
+      return newValue.length;
+    } else {
+      // Percentage, years, months: cursor stays before suffix symbols
+      const match = newValue.match(/^[0-9,.-]+/);
+      return match ? match[0].length : 0;
+    }
   }
   
   // Count logical characters before cursor position in old value
@@ -177,8 +183,8 @@ export const calculateCursorPosition = (oldValue, newValue, oldCursor) => {
   let charsProcessed = 0;
   
   for (let i = 0; i < newValue.length; i++) {
-    // Stop if we hit a letter (start of symbol)
-    if (/[a-zA-Z]/.test(newValue[i])) {
+    // For non-currency types, stop before suffix symbols
+    if (type !== "currency" && /[a-zA-Z]/.test(newValue[i])) {
       break;
     }
     
@@ -187,15 +193,19 @@ export const calculateCursorPosition = (oldValue, newValue, oldCursor) => {
       return newValue[i] === ',' ? i + 1 : i;
     }
     
-    // Count non-comma, non-space characters
+    // Count non-comma, non-space characters (but for currency, allow $ in count)
     if (newValue[i] !== ',' && newValue[i] !== ' ') {
       charsProcessed++;
     }
   }
   
-  // Find the end of the numeric part (before any letters)
-  const match = newValue.match(/^[0-9,.\s-]+/);
-  return match ? Math.min(match[0].length, newValue.length) : 0;
+  // Fallback: find appropriate end position based on type
+  if (type === "currency") {
+    return newValue.length;
+  } else {
+    const match = newValue.match(/^[0-9,.\s-]+/);
+    return match ? Math.min(match[0].length, newValue.length) : 0;
+  }
 };
 
 export const extractNumericValue = (formattedValue, type) => {
