@@ -91,7 +91,7 @@ export const filterNumericInput = (value, allowNegative = true) => {
   return filtered;
 };
 
-export const formatLiveNumber = (value, type = "default") => {
+export const formatLiveNumber = (value, type = "default", preserveTyping = false) => {
   if (!value && value !== 0) return "";
   
   const originalStr = value.toString();
@@ -99,45 +99,49 @@ export const formatLiveNumber = (value, type = "default") => {
   if (isNaN(num)) return "";
   
   const isNegative = num < 0;
-  const absNum = Math.abs(num);
-  const hasDecimal = originalStr.includes(".");
+  const absStr = isNegative ? originalStr.substring(1) : originalStr;
+  const hasDecimal = absStr.includes(".");
   
   let result;
   
   if (!hasDecimal) {
-    // No decimal point in original input - format as integer
-    const intStr = Math.floor(absNum).toString();
+    // No decimal point - format as integer
+    const intStr = Math.floor(Math.abs(num)).toString();
     result = intStr.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   } else {
-    // Decimal point exists in original input
-    if (type === "months") {
-      // Months: always round to whole number (no decimals)
-      const rounded = Math.round(absNum);
-      result = rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    } else if (type === "percent" || type === "years") {
-      // Percentages and Years: remove trailing zeros after decimal
-      let formatted = absNum.toFixed(2); // First get 2 decimal places
-      formatted = formatted.replace(/\.?0+$/, ''); // Remove trailing zeros
-      
-      // Add commas to integer part
-      const [intPart, decPart] = formatted.split(".");
-      const commaInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-      result = decPart ? commaInt + "." + decPart : commaInt;
-    } else {
-      // Currency and default: always show exactly 2 decimal places
-      const twoDecimal = absNum.toFixed(2);
-      const [intPart, decPart] = twoDecimal.split(".");
+    // Has decimal point
+    if (preserveTyping) {
+      // LIVE TYPING: Preserve exactly what user typed, just add commas
+      const [intPart, decPart] = absStr.split(".");
       const commaInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
       result = commaInt + "." + decPart;
+    } else {
+      // FINAL FORMATTING: Apply type-specific decimal rules
+      if (type === "months") {
+        const rounded = Math.round(Math.abs(num));
+        result = rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      } else if (type === "percent" || type === "years") {
+        let formatted = Math.abs(num).toFixed(2);
+        formatted = formatted.replace(/\.?0+$/, '');
+        const [intPart, decPart] = formatted.split(".");
+        const commaInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        result = decPart ? commaInt + "." + decPart : commaInt;
+      } else {
+        // Currency: always 2 decimal places
+        const twoDecimal = Math.abs(num).toFixed(2);
+        const [intPart, decPart] = twoDecimal.split(".");
+        const commaInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        result = commaInt + "." + decPart;
+      }
     }
   }
   
   return isNegative ? "-" + result : result;
 };
 
-export const formatLiveInput = (value, type) => {
+export const formatLiveInput = (value, type, preserveTyping = false) => {
   const filtered = filterNumericInput(value, true);
-  const formatted = formatLiveNumber(filtered, type); // Make sure type is passed here
+  const formatted = formatLiveNumber(filtered, type, preserveTyping);
   
   if (!formatted) return "";
   
