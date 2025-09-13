@@ -59,25 +59,29 @@ export const filterNumericInput = (value, allowNegative = true) => {
   
   let filtered = value.toString();
   
-  // Remove any non-numeric characters except decimal and negative
+  // Remove symbols and text, keep only numbers, decimal, and negative
+  // This regex keeps numeric chars, decimal point, and negative sign
   filtered = filtered.replace(/[^0-9.-]/g, "");
   
   // Handle negative sign - only allow at the beginning
   if (allowNegative) {
     const negativeCount = (filtered.match(/-/g) || []).length;
     if (negativeCount > 1) {
+      // Remove extra negative signs, keep only the first one if input started with -
+      const startsWithNegative = value.toString().trim().startsWith("-");
       filtered = filtered.replace(/-/g, "");
-      if (value.startsWith("-")) {
+      if (startsWithNegative) {
         filtered = "-" + filtered;
       }
     } else if (filtered.includes("-") && !filtered.startsWith("-")) {
+      // Move negative to the front if it's not already there
       filtered = "-" + filtered.replace(/-/g, "");
     }
   } else {
     filtered = filtered.replace(/-/g, "");
   }
   
-  // Handle decimal - only allow one
+  // Handle decimal - only allow one decimal point
   const decimalCount = (filtered.match(/\./g) || []).length;
   if (decimalCount > 1) {
     const parts = filtered.split(".");
@@ -155,7 +159,11 @@ export const formatLiveInput = (value, type) => {
 
 export const calculateCursorPosition = (oldValue, newValue, oldCursor) => {
   if (oldCursor <= 0) return 0;
-  if (oldCursor >= oldValue.length) return newValue.length;
+  if (oldCursor >= oldValue.length) {
+    // Cursor was at end - find the end of numeric part in new value
+    const match = newValue.match(/^[0-9,.-]+/);
+    return match ? match[0].length : 0;
+  }
   
   // Count logical characters before cursor position in old value
   let logicalCharsBefore = 0;
@@ -169,19 +177,25 @@ export const calculateCursorPosition = (oldValue, newValue, oldCursor) => {
   let charsProcessed = 0;
   
   for (let i = 0; i < newValue.length; i++) {
-    // If we've found all the logical characters we need, cursor goes after them
+    // Stop if we hit a letter (start of symbol)
+    if (/[a-zA-Z]/.test(newValue[i])) {
+      break;
+    }
+    
+    // If we've found all the logical characters we need
     if (charsProcessed === logicalCharsBefore) {
-      // If current position is a comma, move cursor after it
       return newValue[i] === ',' ? i + 1 : i;
     }
     
-    // Count non-comma characters
-    if (newValue[i] !== ',') {
+    // Count non-comma, non-space characters
+    if (newValue[i] !== ',' && newValue[i] !== ' ') {
       charsProcessed++;
     }
   }
   
-  return newValue.length;
+  // Find the end of the numeric part (before any letters)
+  const match = newValue.match(/^[0-9,.\s-]+/);
+  return match ? Math.min(match[0].length, newValue.length) : 0;
 };
 
 export const extractNumericValue = (formattedValue, type) => {
