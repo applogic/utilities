@@ -14,7 +14,7 @@ export {
   calculateCOCR30, 
   calculateCOCRAtPercent,
   calculateDscrPayment,
-  calculateJvPayment,
+  calculateSfPayment,
   calculateNetToBuyer,
   calculateNOIByType,
   calculatePMT, 

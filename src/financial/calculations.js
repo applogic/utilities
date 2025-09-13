@@ -133,9 +133,9 @@ export function calculateCOCRAtPercent(askingPrice, noi, downPercent, options = 
     const dscrLoanAmount = askingPrice * (availableDscrPercent / 100);
     
     const dscrPayment = calculatePMT(dscrLoanAmount, dscrRate, dscrTerm) * 12;
-    const jvPayment = calculatePMT(sellerFiAmount, FINANCIAL_CONSTANTS.SELLER_FI_INTEREST_RATE, sellerFiTerm) * 12;
+    const sfPayment = calculatePMT(sellerFiAmount, FINANCIAL_CONSTANTS.SELLER_FI_INTEREST_RATE, sellerFiTerm) * 12;
     
-    const annualCashFlow = noi - dscrPayment - jvPayment;
+    const annualCashFlow = noi - dscrPayment - sfPayment;
     const cocr = (annualCashFlow / cashInvested) * 100;
     
     return cocr;
@@ -333,13 +333,13 @@ export function calculateDscrPayment(askingPrice, dscrPercent, dscrRate, dscrAmo
   return calculatePMT(dscrLoanAmount, dscrRate, dscrAmortization);
 }
 
-// JV Payment calculation using existing calculatePMT  
-export function calculateJvPayment(askingPrice, sellerFiPercent, sellerFiRate, sellerFiAmortization) {
+// SF Payment calculation using existing calculatePMT  
+export function calculateSfPayment(askingPrice, sellerFiPercent, sellerFiRate, sellerFiAmortization) {
   const sellerFiAmount = askingPrice * (sellerFiPercent / 100);
   return calculatePMT(sellerFiAmount, sellerFiRate, sellerFiAmortization);
 }
 
 // Cash Flow calculation (matching loopnet-analyzer exactly)
-export function calculateCashFlow(monthlyNOI, dscrPayment, jvPayment) {
-  return monthlyNOI - (dscrPayment + jvPayment);
+export function calculateCashFlow(monthlyNOI, dscrPayment, sfPayment) {
+  return monthlyNOI - (dscrPayment + sfPayment);
 }
