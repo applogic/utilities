@@ -31,7 +31,15 @@ export { extractPhoneNumber, extractBedrooms } from "./data/extractors.js";
 export { calculateDOM } from "./date/utilities.js";
 
 // Formatting utilities
-export { formatInputDisplay, parseNumericInput } from "./formatting/financial-formatting.js";
+export { 
+  calculateCursorPosition,
+  extractNumericValue,
+  filterNumericInput,
+  formatInputDisplay,
+  formatLiveInput,
+  formatLiveNumber,
+  parseNumericInput
+} from "./formatting/financial-formatting.js";
 
 // Configuration constants
 export * from './config/financial.js';

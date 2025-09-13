@@ -51,3 +51,159 @@ export const parseNumericInput = (value) => {
   const cleaned = value.toString().replace(/[^0-9.-]/g, "");
   return parseFloat(cleaned) || 0;
 };
+
+// Add these functions to the existing file:
+
+export const filterNumericInput = (value, allowNegative = true) => {
+  if (!value) return "";
+  
+  let filtered = value.toString();
+  
+  // Remove any non-numeric characters except decimal and negative
+  filtered = filtered.replace(/[^0-9.-]/g, "");
+  
+  // Handle negative sign - only allow at the beginning
+  if (allowNegative) {
+    const negativeCount = (filtered.match(/-/g) || []).length;
+    if (negativeCount > 1) {
+      filtered = filtered.replace(/-/g, "");
+      if (value.startsWith("-")) {
+        filtered = "-" + filtered;
+      }
+    } else if (filtered.includes("-") && !filtered.startsWith("-")) {
+      filtered = "-" + filtered.replace(/-/g, "");
+    }
+  } else {
+    filtered = filtered.replace(/-/g, "");
+  }
+  
+  // Handle decimal - only allow one
+  const decimalCount = (filtered.match(/\./g) || []).length;
+  if (decimalCount > 1) {
+    const parts = filtered.split(".");
+    filtered = parts[0] + "." + parts.slice(1).join("");
+  }
+  
+  return filtered;
+};
+
+export const formatLiveNumber = (value, type = "default") => {
+  if (!value && value !== 0) return "";
+  
+  const originalStr = value.toString();
+  const num = parseFloat(originalStr);
+  if (isNaN(num)) return "";
+  
+  const isNegative = num < 0;
+  const absNum = Math.abs(num);
+  const hasDecimal = originalStr.includes(".");
+  
+  let result;
+  
+  if (!hasDecimal) {
+    // No decimal point in original input - format as integer
+    const intStr = Math.floor(absNum).toString();
+    result = intStr.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  } else {
+    // Decimal point exists in original input
+    if (type === "months") {
+      // Months: always round to whole number (no decimals)
+      const rounded = Math.round(absNum);
+      result = rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    } else if (type === "percent" || type === "years") {
+      // Percentages and Years: remove trailing zeros after decimal
+      let formatted = absNum.toFixed(2); // First get 2 decimal places
+      formatted = formatted.replace(/\.?0+$/, ''); // Remove trailing zeros
+      
+      // Add commas to integer part
+      const [intPart, decPart] = formatted.split(".");
+      const commaInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      result = decPart ? commaInt + "." + decPart : commaInt;
+    } else {
+      // Currency and default: always show exactly 2 decimal places
+      const twoDecimal = absNum.toFixed(2);
+      const [intPart, decPart] = twoDecimal.split(".");
+      const commaInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      result = commaInt + "." + decPart;
+    }
+  }
+  
+  return isNegative ? "-" + result : result;
+};
+
+export const formatLiveInput = (value, type) => {
+  const filtered = filterNumericInput(value, true);
+  const formatted = formatLiveNumber(filtered, type); // Make sure type is passed here
+  
+  if (!formatted) return "";
+  
+  switch (type) {
+    case "currency":
+      return "$ " + formatted;
+    case "percent":
+      return formatted + " %";
+    case "years":
+      return formatted + " yrs.";
+    case "months":
+      return formatted + " mos.";
+    case "number":
+      return formatted;
+    default:
+      return formatted;
+  }
+};
+
+export const calculateCursorPosition = (oldValue, newValue, oldCursor) => {
+  if (oldCursor <= 0) return 0;
+  if (oldCursor >= oldValue.length) return newValue.length;
+  
+  // Count logical characters before cursor position in old value
+  let logicalCharsBefore = 0;
+  for (let i = 0; i < oldCursor; i++) {
+    if (oldValue[i] !== ',') {
+      logicalCharsBefore++;
+    }
+  }
+  
+  // Find position after the same number of logical characters in new value
+  let charsProcessed = 0;
+  
+  for (let i = 0; i < newValue.length; i++) {
+    // If we've found all the logical characters we need, cursor goes after them
+    if (charsProcessed === logicalCharsBefore) {
+      // If current position is a comma, move cursor after it
+      return newValue[i] === ',' ? i + 1 : i;
+    }
+    
+    // Count non-comma characters
+    if (newValue[i] !== ',') {
+      charsProcessed++;
+    }
+  }
+  
+  return newValue.length;
+};
+
+export const extractNumericValue = (formattedValue, type) => {
+  if (!formattedValue) return 0;
+  
+  let cleaned = formattedValue.toString();
+  
+  switch (type) {
+    case "currency":
+      cleaned = cleaned.replace(/^\$\s*/, "").trim();
+      break;
+    case "percent":
+      cleaned = cleaned.replace(/\s*%$/, "").trim();
+      break;
+    case "years":
+      cleaned = cleaned.replace(/\s*yrs\.$/, "").trim();
+      break;
+    case "months":
+      cleaned = cleaned.replace(/\s*mos\.$/, "").trim();
+      break;
+  }
+  
+  cleaned = cleaned.replace(/,/g, "");
+  return parseFloat(cleaned) || 0;
+};
