@@ -1,0 +1,209 @@
+/* Dashboard styles - extracted from existing dashboard CSS AS-IS */
+
+/* Base dashboard styles */
+.dashboard-container {
+  min-height: 100vh;
+  background: var(--bg-secondary, #f8f9fa);
+  font-family: var(--font-family-base, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif);
+  color: var(--text-primary, #212529);
+}
+
+.header {
+  background: var(--bg-primary, white);
+  padding: var(--spacing-xl, 20px) var(--spacing-2xl, 24px);
+  border-bottom: 1px solid var(--border-color-light, #e9ecef);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+}
+
+.header h1 {
+  color: var(--color-primary, #007bff);
+  margin-bottom: var(--spacing-xl, 20px);
+}
+
+.filters {
+  display: flex;
+  gap: var(--spacing-lg, 15px);
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 5px);
+}
+
+.filter-group label {
+  font-size: var(--font-size-sm, 12px);
+  color: var(--text-secondary, #6c757d);
+  font-weight: var(--font-weight-medium, 500);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-group input, .filter-group select {
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 12px);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: var(--border-radius-sm, 4px);
+  font-size: var(--font-size-base, 14px);
+  min-width: 120px;
+}
+
+.filter-group button {
+  padding: var(--spacing-sm, 8px) var(--spacing-lg, 16px);
+  background: var(--color-primary, #007bff);
+  color: var(--text-white, white);
+  border: none;
+  border-radius: var(--border-radius-sm, 4px);
+  font-size: var(--font-size-base, 14px);
+  cursor: pointer;
+}
+
+.filter-group button:hover {
+  background: var(--color-primary-hover, #0056b3);
+}
+
+.stats {
+  display: flex;
+  gap: var(--spacing-xl, 20px);
+  margin-top: var(--spacing-xl, 20px);
+  font-size: var(--font-size-base, 14px);
+  color: var(--text-secondary, #6c757d);
+}
+
+.table-container {
+  background: var(--bg-primary, white);
+  border-radius: var(--border-radius-lg, 8px);
+  box-shadow: var(--shadow-base, 0 2px 4px rgba(0,0,0,0.1));
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: var(--spacing-lg, 15px) var(--spacing-md, 12px);
+  text-align: left;
+  border-bottom: 1px solid var(--border-color-light, #e9ecef);
+}
+
+th {
+  background: var(--bg-secondary, #f8f9fa);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--text-muted, #495057);
+  font-size: var(--font-size-sm, 12px);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+th a {
+  color: var(--text-muted, #495057);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+}
+
+th a:hover {
+  color: var(--color-primary, #007bff);
+}
+
+th a.sort-active {
+  color: var(--color-primary, #007bff);
+  font-weight: var(--font-weight-bold, 700);
+}
+
+tr:hover {
+  background: var(--bg-secondary, #f8f9fa);
+}
+
+.property-link {
+  color: var(--color-primary, #007bff);
+  text-decoration: none;
+  font-weight: var(--font-weight-medium, 500);
+}
+
+.property-link:hover {
+  text-decoration: underline;
+}
+
+.contract-state {
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  border-radius: var(--border-radius-xl, 12px);
+  font-size: var(--font-size-xs, 11px);
+  font-weight: var(--font-weight-semibold, 600);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.contract-none { 
+  background: var(--border-color-light, #e9ecef); 
+  color: var(--text-muted, #495057); 
+}
+
+.contract-loi_sent { 
+  background: #fff3cd; 
+  color: #856404; 
+}
+
+.contract-loi_agreed { 
+  background: #d4edda; 
+  color: #155724; 
+}
+
+.contract-loi_rejected { 
+  background: #f8d7da; 
+  color: #721c24; 
+}
+
+.contract-contract_signed { 
+  background: #d1ecf1; 
+  color: #0c5460; 
+}
+
+.contract-closed { 
+  background: #d4edda; 
+  color: #155724; 
+}
+
+.contract-not_interested { 
+  background: #f8d7da; 
+  color: #721c24; 
+}
+
+.date-cell {
+  font-size: var(--font-size-sm, 13px);
+  color: var(--text-secondary, #6c757d);
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-sm, 8px);
+  margin-top: var(--spacing-xl, 20px);
+  padding: var(--spacing-xl, 20px);
+}
+
+.page-link {
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 12px);
+  background: var(--bg-primary, white);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: var(--border-radius-sm, 4px);
+  color: var(--text-primary, #212529);
+  text-decoration: none;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.page-link:hover {
+  background: var(--color-primary, #007bff);
+  color: var(--text-white, white);
+  border-color: var(--color-primary, #007bff);
+}
+
+.page-link.active {
+  background: var(--color-primary, #007bff);
+  color: var(--text-white, white);
+  border-color: var(--color-primary, #007bff);
+}

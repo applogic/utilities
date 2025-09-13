@@ -9,6 +9,7 @@
   },
   "files": [
     "dist",
+    "src/styles",
     "README.md"
   ],
   "sideEffects": false,
@@ -16,7 +17,8 @@
     "node": ">=16"
   },
   "scripts": {
-    "build": "rollup -c",
+    "build": "node build-styles.js && rollup -c",
+    "prebuild": "node build-styles.js",
     "dev": "rollup -c -w",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -45,3 +45,5 @@ export {
 export * from './config/financial.js';
 export * from './config/property-types.js';
 export * from './config/business.js';
+
+export { injectFooterStyles, injectDashboardStyles, styles } from './styles/browser.js';
