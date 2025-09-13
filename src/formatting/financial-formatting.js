@@ -141,7 +141,7 @@ export const formatLiveNumber = (value, type = "default", preserveTyping = false
 
 export const formatLiveInput = (value, type, preserveTyping = false) => {
   const filtered = filterNumericInput(value, true);
-  const formatted = formatLiveNumber(filtered, type, preserveTyping);
+  let formatted = formatLiveNumber(filtered, type, preserveTyping);
   
   if (formatted === "" || formatted === null || formatted === undefined) formatted = "0";
   
