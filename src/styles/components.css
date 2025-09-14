@@ -11,7 +11,7 @@
   z-index: var(--z-footer);
   padding: var(--spacing-xl) var(--spacing-xxxl);
   font-family: var(--font-family-system);
-  font-size: var(--spacing-xl);
+  font-size: var(--font-size-lg);
   color: var(--text-primary);
   width: 100%;
   box-sizing: border-box;
@@ -133,7 +133,7 @@
 
 .metric-value {
   font-weight: var(--font-weight-semibold);
-  font-size: var(--spacing-xl);
+  font-size: var(--font-size-lg);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -171,4 +171,51 @@
 @keyframes pulse {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 1; }
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+
+@media (max-width: 1400px) {
+  .metrics-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  
+  .btn-primary {
+    padding: 10px var(--spacing-xl);
+    font-size: var(--font-size-base);
+  }
+}
+
+@media (max-width: 1000px) {
+  .metrics-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .ext-footer {
+    padding: var(--spacing-lg) var(--spacing-xl);
+  }
+  
+  .footer-container {
+    flex-direction: column;
+    gap: var(--spacing-lg);
+  }
+  
+  .footer-controls {
+    align-items: stretch;
+  }
+  
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--grid-gap-small);
+  }
+  
+  .metric-value {
+    font-size: var(--font-size-md);
+  }
+
+  .btn-primary {
+    justify-content: center;
+  }
 }
