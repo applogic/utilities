@@ -9,6 +9,8 @@ Make your changes then:
 ```bash
 npm run build
 npm test
+git commit 
+git push origin
 ```
 
 and then, depending on the changes:
@@ -16,23 +18,24 @@ and then, depending on the changes:
 For bug fixes (backward compatible):
 
 ```bash
-npm run release:patch
+bash deploy.sh patch
 ```
 → bumps 1.0.0 → 1.0.1
 
 For new features (still backward compatible):
 ```bash
-npm run release:minor
+bash deploy.sh minor
 ```
 → bumps 1.0.0 → 1.1.0
 
 For breaking changes:
 ```bash
-npm run release:major
+bash deploy.sh major
 ```
 → bumps 1.0.0 → 2.0.0
 
-Each script will:
+deploy.sh script will:
+- Run any pre-build scripts/processes
 - Update package.json version
 - Commit the version bump + create a git tag
 - Push commit + tag to your repo
