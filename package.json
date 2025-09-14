@@ -5,11 +5,11 @@
   "type": "module",
   "main": "dist/index.js",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./dist/styles/*.css": "./dist/styles/*.css"
   },
   "files": [
     "dist",
-    "src/styles",
     "README.md"
   ],
   "sideEffects": false,
