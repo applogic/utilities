@@ -17,7 +17,7 @@
     "node": ">=16"
   },
   "scripts": {
-    "build": "rollup -c && mkdir -p dist/styles && cp src/styles/* dist/styles/",
+    "build": "rollup -c && bash -c 'mkdir -p dist/styles && cp src/styles/*.css dist/styles/'",
     "dev": "rollup -c -w",
     "test": "vitest run",
     "test:watch": "vitest",
