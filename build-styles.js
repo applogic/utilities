@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Simple build script to read CSS files and generate browser-compatible JS
+// Simple build script - no CSS variables, just clean CSS
 
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
