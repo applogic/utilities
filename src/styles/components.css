@@ -384,7 +384,12 @@
 }
 
 /* State modifiers */
-.negative {
+/* When footer has negative class, override ALL metric values */
+.negative .metric-value {
+  color: var(--color-danger) !important;
+}
+
+.negative .metric-value:hover {
   color: var(--color-danger) !important;
 }
 
