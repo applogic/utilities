@@ -89,6 +89,160 @@
   line-height: 1.2;
 }
 
+/* ===== METRIC COLOR CLASSES ===== */
+
+.prop-price {
+  color: var(--color-prop-price);
+}
+
+.prop-price:hover {
+  color: var(--color-prop-price-hover);
+}
+
+.prop-name {
+  color: var(--color-prop-name);
+}
+
+.prop-name:hover {
+  color: var(--color-prop-name-hover);
+}
+
+.prop-lead-status {
+  color: var(--color-prop-lead-status);
+}
+
+.prop-lead-status:hover {
+  color: var(--color-prop-lead-status-hover);
+}
+
+.prop-lead-status.taken {
+  color: var(--color-prop-lead-status-taken);
+}
+
+.prop-lead-status.taken:hover {
+  color: var(--color-prop-lead-status-taken-hover);
+}
+
+.prop-cashflow {
+  color: var(--color-prop-cashflow-positive);
+}
+
+.prop-cashflow:hover {
+  color: var(--color-prop-cashflow-positive-hover);
+}
+
+.prop-cashflow.negative {
+  color: var(--color-prop-cashflow-negative);
+}
+
+.prop-cashflow.negative:hover {
+  color: var(--color-prop-cashflow-negative-hover);
+}
+
+.prop-cocr-15 {
+  color: var(--color-prop-cocr-15);
+}
+
+.prop-cocr-15:hover {
+  color: var(--color-prop-cocr-15-hover);
+}
+
+.prop-cocr-30 {
+  color: var(--color-prop-cocr-30);
+}
+
+.prop-cocr-30:hover {
+  color: var(--color-prop-cocr-30-hover);
+}
+
+.prop-cap {
+  color: var(--color-prop-cap);
+}
+
+.prop-cap:hover {
+  color: var(--color-prop-cap-hover);
+}
+
+.prop-noi {
+  color: var(--color-prop-noi);
+}
+
+.prop-noi:hover {
+  color: var(--color-prop-noi-hover);
+}
+
+.prop-equity {
+  color: var(--color-prop-equity);
+}
+
+.prop-equity:hover {
+  color: var(--color-prop-equity-hover);
+}
+
+.prop-dom {
+  color: var(--color-prop-dom);
+}
+
+.prop-dom:hover {
+  color: var(--color-prop-dom-hover);
+}
+
+.prop-seller-fi {
+  color: var(--color-prop-seller-fi);
+}
+
+.prop-seller-fi:hover {
+  color: var(--color-prop-seller-fi-hover);
+}
+
+.prop-down {
+  color: var(--color-prop-down);
+}
+
+.prop-down:hover {
+  color: var(--color-prop-down-hover);
+}
+
+.prop-contact {
+  color: var(--color-prop-contact);
+}
+
+.prop-contact:hover {
+  color: var(--color-prop-contact-hover);
+}
+
+.prop-dscr {
+  color: var(--color-prop-dscr);
+}
+
+.prop-dscr:hover {
+  color: var(--color-prop-dscr-hover);
+}
+
+.prop-sf {
+  color: var(--color-prop-sf);
+}
+
+.prop-sf:hover {
+  color: var(--color-prop-sf-hover);
+}
+
+.prop-net {
+  color: var(--color-prop-net);
+}
+
+.prop-net:hover {
+  color: var(--color-prop-net-hover);
+}
+
+.prop-assignment {
+  color: var(--color-prop-assignment);
+}
+
+.prop-assignment:hover {
+  color: var(--color-prop-assignment-hover);
+}
+
 /* ===== FORM CONTROLS ===== */
 
 .dropdown {
@@ -177,18 +331,6 @@
   font-weight: var(--font-weight-semibold) !important;
 }
 
-/* Interactive behaviors */
-.interactive {
-  cursor: pointer !important;
-  color: var(--color-primary) !important;
-  transition: color 0.2s ease;
-}
-
-.interactive:hover {
-  color: var(--color-primary-hover) !important;
-  text-decoration: underline;
-}
-
 .clickable-not-selectable {
   cursor: pointer;
   user-select: none;
@@ -205,50 +347,13 @@
   text-decoration: underline;
 }
 
-/* Position utilities for indicators */
-.has-indicator {
-  position: relative !important;
-  padding-right: 18px !important;
-}
-
-/* Triangle indicators */
-.triangle-down::after {
-  content: "";
-  position: absolute;
-  right: 2px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 6px solid currentColor;
-}
-
-.triangle-up::after {
-  content: "";
-  position: absolute;
-  right: 2px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-bottom: 6px solid currentColor;
-}
-
-.triangle-right::after {
-  content: "";
-  position: absolute;
-  right: 2px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 0;
-  height: 0;
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-  border-left: 6px solid currentColor;
+.triangle::after {
+  content: ' ▶';
+  font-size: 14px;
+  color: inherit;
+  margin-left: 4px;
+  vertical-align: initial;
+  display: inline-block;
 }
 
 /* Loading state */
@@ -321,10 +426,6 @@
 
   .btn-primary {
     justify-content: center;
-  }
-  
-  .has-indicator {
-    padding-right: 15px !important;
   }
   
   .triangle-down::after,

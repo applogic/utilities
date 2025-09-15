@@ -6,7 +6,64 @@
   --color-danger: #dc3545;
   --color-warning: #ffc107;
   --color-info: #17a2b8;
-  
+
+  --color-prop-price: #c92020ff;
+  --color-prop-price-hover: #a01818ff;
+
+  --color-prop-name: #007bff;
+  --color-prop-name-hover: #0056b3;
+
+  --color-prop-lead-status: #28a745;
+  --color-prop-lead-status-hover: #1e7e34;
+
+  --color-prop-lead-status-taken: #c92020ff;
+  --color-prop-lead-status-taken-hover: #a01818ff;
+
+  --color-prop-cashflow-positive: #28a745;
+  --color-prop-cashflow-positive-hover: #1e7e34;
+  --color-prop-cashflow-negative: #dc3545;
+  --color-prop-cashflow-negative-hover: #a71d2aff;
+
+  --color-prop-cocr-15: #6c757d;
+  --color-prop-cocr-15-hover: #5a6268;
+  --color-prop-cocr-30: #17a2b8;
+  --color-prop-cocr-30-hover: #117a8b;
+
+  --color-prop-cap: #2c79cc;
+  --color-prop-cap-hover: #0056b3;
+
+  --color-prop-noi: #dc3545;
+  --color-prop-noi-hover: #a71d2aff;
+
+  --color-prop-equity: #fd7e14;
+  --color-prop-equity-hover: #e8590cff;
+
+  --color-prop-dom: #6610f2;
+  --color-prop-dom-hover: #520dc2;  
+
+  --color-prop-seller-fi: #b65b11;
+  --color-prop-seller-fi-hover: #8c430e;
+
+  --color-prop-down: #6f42c1;
+  --color-prop-down-hover: #5936a2;
+
+  --color-prop-contact: #343a40;
+  --color-prop-contact-hover: #23272b;
+
+  --color-prop-dscr: #e25f6c;
+  --color-prop-dscr-hover: #c92020ff;
+
+  --color-prop-sf: #53dbf0;
+  --color-prop-sf-hover: #2ecce3;
+
+  --color-prop-net: #649670;
+  --color-prop-net-hover: #3d6b47;
+
+  --color-prop-assignment: #e83e8c;
+  --color-prop-assignment-hover: #c82375;
+
+
+
   /* Extension UI Colors */
   --bg-footer: #ededed;
   --border-footer: #919090ff;
