@@ -91,156 +91,167 @@
 
 /* ===== METRIC COLOR CLASSES ===== */
 
+
+
+.prop-red {
+
+}
+
 .prop-price {
-  color: var(--color-prop-price);
+  color: var(--color-prop-red);
 }
 
 .prop-price:hover {
-  color: var(--color-prop-price-hover);
+  color: var(--color-prop-red-hover);
 }
 
 .prop-name {
-  color: var(--color-prop-name);
+  color: var(--color-prop-blue);
 }
 
 .prop-name:hover {
-  color: var(--color-prop-name-hover);
+  color: var(--color-prop-blue-hover);
 }
 
 .prop-lead-status {
-  color: var(--color-prop-lead-status);
+  color: var(--color-prop-green);
 }
 
 .prop-lead-status:hover {
-  color: var(--color-prop-lead-status-hover);
+  color: var(--color-prop-green-hover);
 }
 
 .prop-lead-status.taken {
-  color: var(--color-prop-lead-status-taken);
+  color: var(--color-prop-red);
 }
 
 .prop-lead-status.taken:hover {
-  color: var(--color-prop-lead-status-taken-hover);
+  color: var(--color-prop-red-hover);
 }
 
 .prop-cashflow {
-  color: var(--color-prop-cashflow-positive);
+  color: var(--color-prop-green);
 }
 
 .prop-cashflow:hover {
-  color: var(--color-prop-cashflow-positive-hover);
+  color: var(--color-prop-green-hover);
 }
 
 .prop-cashflow.negative {
-  color: var(--color-prop-cashflow-negative);
+  color: var(--color-prop-red);
 }
 
 .prop-cashflow.negative:hover {
-  color: var(--color-prop-cashflow-negative-hover);
+  color: var(--color-prop-red-hover);
 }
 
 .prop-cocr-15 {
-  color: var(--color-prop-cocr-15);
+  color: var(--color-prop-teal);
 }
 
 .prop-cocr-15:hover {
-  color: var(--color-prop-cocr-15-hover);
+  color: var(--color-prop-teal-hover);
 }
 
 .prop-cocr-30 {
-  color: var(--color-prop-cocr-30);
+  color: var(--color-prop-teal);
 }
 
 .prop-cocr-30:hover {
-  color: var(--color-prop-cocr-30-hover);
+  color: var(--color-prop-teal-hover);
 }
 
 .prop-cap {
-  color: var(--color-prop-cap);
+  color: var(--color-prop-red);
 }
 
 .prop-cap:hover {
-  color: var(--color-prop-cap-hover);
+  color: var(--color-prop-red-hover);
 }
 
 .prop-noi {
-  color: var(--color-prop-noi);
+  color: var(--color-prop-red);
 }
 
 .prop-noi:hover {
-  color: var(--color-prop-noi-hover);
+  color: var(--color-prop-red-hover);
 }
 
 .prop-equity {
-  color: var(--color-prop-equity);
+  color: var(--color-prop-purple);
 }
 
 .prop-equity:hover {
-  color: var(--color-prop-equity-hover);
+  color: var(--color-prop-purple-hover);
 }
 
 .prop-dom {
-  color: var(--color-prop-dom);
+  color: var(--color-prop-purple);
 }
 
 .prop-dom:hover {
-  color: var(--color-prop-dom-hover);
+  color: var(--color-prop-purple-hover);
 }
 
 .prop-seller-fi {
-  color: var(--color-prop-seller-fi);
+  color: var(--color-prop-brown);
 }
 
 .prop-seller-fi:hover {
-  color: var(--color-prop-seller-fi-hover);
+  color: var(--color-prop-brown-hover);
 }
 
 .prop-down {
-  color: var(--color-prop-down);
+  color: var(--color-prop-brown);
 }
 
 .prop-down:hover {
-  color: var(--color-prop-down-hover);
+  color: var(--color-prop-brown-hover);
+}
+
+.prop-dom-metric {
+  background: #ffffff8c;
+  border: 1px solid #cdcdcd;
 }
 
 .prop-contact {
-  color: var(--color-prop-contact);
+  color: var(--color-prop-dark-grey);
 }
 
 .prop-contact:hover {
-  color: var(--color-prop-contact-hover);
+  color: var(--color-prop-dark-grey-hover);
 }
 
 .prop-dscr {
-  color: var(--color-prop-dscr);
+  color: var(--color-prop-brown);
 }
 
 .prop-dscr:hover {
-  color: var(--color-prop-dscr-hover);
+  color: var(--color-prop-brown-hover);
 }
 
 .prop-sf {
-  color: var(--color-prop-sf);
+  color: var(--color-prop-brown);
 }
 
 .prop-sf:hover {
-  color: var(--color-prop-sf-hover);
+  color: var(--color-prop-brown-hover);
 }
 
 .prop-net {
-  color: var(--color-prop-net);
+  color: var(--color-prop-dark-green);
 }
 
 .prop-net:hover {
-  color: var(--color-prop-net-hover);
+  color: var(--color-prop-dark-green-hover);
 }
 
 .prop-assignment {
-  color: var(--color-prop-assignment);
+  color: var(--color-prop-dark-green);
 }
 
 .prop-assignment:hover {
-  color: var(--color-prop-assignment-hover);
+  color: var(--color-prop-dark-green-hover);
 }
 
 /* ===== FORM CONTROLS ===== */
@@ -375,11 +386,6 @@
 /* State modifiers */
 .negative {
   color: var(--color-danger) !important;
-  font-weight: var(--font-weight-semibold) !important;
-}
-
-.positive {
-  color: var(--color-success) !important;
 }
 
 /* ===== RESPONSIVE DESIGN ===== */
