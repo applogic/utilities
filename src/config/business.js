@@ -29,9 +29,11 @@ export const BUSINESS_CONSTANTS = {
 
 
   
-  // Export/import constants
+  // URL constants
   EXPORT_URL_BASE: "https://app.archerjessop.com/property-dashboard/import",
   EXCLUDED_EXPORT_VALUES: ["Loading...", "Not found", "", null, undefined],
+
+  DASHBOARD_URL_BASE: "https://app.archerjessop.com/property-dashboard/",
   
 };
 
