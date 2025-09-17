@@ -15,7 +15,6 @@ export {
   calculateCOCRAtPercent,
   calculateDiscountFromPrice,
   calculateDscrPayment,
-  calculateSfPayment,
   calculateNetToBuyer,
   calculateNOIByType,
   calculatePMT, 
