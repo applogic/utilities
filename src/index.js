@@ -13,12 +13,15 @@ export {
   calculateCashOutAfterRefi,
   calculateCOCR30, 
   calculateCOCRAtPercent,
+  calculateDiscountFromPrice,
   calculateDscrPayment,
   calculateSfPayment,
   calculateNetToBuyer,
   calculateNOIByType,
   calculatePMT, 
-  calculatePriceForCOCR
+  calculatePriceForCOCR,
+  calculatePriceFromDiscount,
+  calculateSfPayment,
 } from "./financial/calculations.js";
 
 // Financial formatters
@@ -40,6 +43,9 @@ export {
   formatLiveNumber,
   parseNumericInput
 } from "./formatting/financial-formatting.js";
+
+// Text formatting utilities
+export { normalizeWhitespace } from "./formatting/text.js";
 
 // Configuration constants
 export * from './config/financial.js';

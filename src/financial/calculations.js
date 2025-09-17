@@ -343,3 +343,27 @@ export function calculateSfPayment(askingPrice, sellerFiPercent, sellerFiRate, s
 export function calculateCashFlow(monthlyNOI, dscrPayment, sfPayment) {
   return monthlyNOI - (dscrPayment + sfPayment);
 }
+
+/**
+ * Calculate discount percentage from asking price and offered price
+ * @param {number} askingPrice - Property asking price
+ * @param {number} priceOffered - Offered price
+ * @returns {number} Discount as decimal (positive = discount, negative = premium)
+ */
+export function calculateDiscountFromPrice(askingPrice, priceOffered) {
+  if (!askingPrice || askingPrice <= 0) return 0;
+  
+  return (askingPrice - priceOffered) / askingPrice;
+}
+
+/**
+ * Calculate price from asking price and discount percentage
+ * @param {number} askingPrice - Property asking price  
+ * @param {number} discountPercent - Discount as decimal (positive = discount, negative = premium)
+ * @returns {number} Calculated price
+ */
+export function calculatePriceFromDiscount(askingPrice, discountPercent) {
+  if (!askingPrice || askingPrice <= 0) return 0;
+  
+  return askingPrice * (1 - discountPercent);
+}
