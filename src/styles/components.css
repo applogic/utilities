@@ -93,8 +93,12 @@
 
 
 
-.prop-red {
+.cash-flow-negative .red-if-negative {
+  color: var(--color-dark-red) !important;
+}
 
+.cash-flow-negative .red-if-negative:hover {
+  color: var(--color-dark-red-hover) !important;
 }
 
 .prop-price {
