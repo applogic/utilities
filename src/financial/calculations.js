@@ -116,11 +116,8 @@ export function calculatePriceForCOCR(noi, targetCOCR = 0.15, options = {}) {
  */
 export function calculateCOCRAtPercent(askingPrice, noi, downPercent, options = {}) {
   const {
-    dscrLtvPercent = FINANCIAL_CONSTANTS.DEFAULT_DSCR_PERCENTAGE * 100,
-    sellerFiPercent = 0,
     dscrRate = FINANCIAL_CONSTANTS.DSCR_INTEREST_RATE,
     dscrTerm = FINANCIAL_CONSTANTS.DSCR_AMORTIZATION,
-    sellerFiTerm = FINANCIAL_CONSTANTS.SELLER_FI_AMORTIZATION
   } = options;
 
   try {
@@ -128,14 +125,11 @@ export function calculateCOCRAtPercent(askingPrice, noi, downPercent, options = 
     const cashInvested = askingPrice * downDecimal;
     
     // Fix financing structure: seller financing reduces available DSCR loan
-    const sellerFiAmount = askingPrice * (sellerFiPercent / 100);
-    const availableDscrPercent = Math.max(0, dscrLtvPercent - sellerFiPercent);
-    const dscrLoanAmount = askingPrice * (availableDscrPercent / 100);
+    const dscrLoanAmount = askingPrice - cashInvested;
     
     const dscrPayment = calculatePMT(dscrLoanAmount, dscrRate, dscrTerm) * 12;
-    const sfPayment = calculatePMT(sellerFiAmount, FINANCIAL_CONSTANTS.SELLER_FI_INTEREST_RATE, sellerFiTerm) * 12;
     
-    const annualCashFlow = noi - dscrPayment - sfPayment;
+    const annualCashFlow = noi - dscrPayment;
     const cocr = (annualCashFlow / cashInvested) * 100;
     
     return cocr;
