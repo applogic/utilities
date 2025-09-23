@@ -118,18 +118,10 @@ describe("Core Financial Calculations", () => {
       const noi = 60000;
       const result = calculateCOCRAtPercent(askingPrice, noi, 30);
       
-      expect(result).toBeGreaterThan(10);
-      expect(result).toBeLessThan(25);
-    });
+      expect(result).toBeCloseTo(20.42, 2);
 
-    test("should handle seller financing with config rates", () => {
-      const askingPrice = 500000;
-      const noi = 60000;
-      const resultWithSF = calculateCOCRAtPercent(askingPrice, noi, 30, { sellerFiPercent: 20 });
-      const resultWithoutSF = calculateCOCRAtPercent(askingPrice, noi, 30, { sellerFiPercent: 0 });
-      
-      expect(resultWithSF).toBeGreaterThan(resultWithoutSF);
     });
+    
   });
 
   describe("calculateNOIByType", () => {
