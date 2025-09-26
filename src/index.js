@@ -21,6 +21,7 @@ export {
   calculatePriceForCOCR,
   calculatePriceFromDiscount,
   calculateSfPayment,
+  safePercentage,
 } from "./financial/calculations.js";
 
 // Financial formatters

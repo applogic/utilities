@@ -361,3 +361,7 @@ export function calculatePriceFromDiscount(askingPrice, discountPercent) {
   
   return askingPrice * (1 - discountPercent);
 }
+
+export function safePercentage = (value, fallback = 100) => {
+  return (value != null && !isNaN(value)) ? (value * 100) : fallback;
+}
