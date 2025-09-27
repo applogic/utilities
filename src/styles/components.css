@@ -449,3 +449,23 @@
     right: 0px;
   }
 }
+/* Equity source visual indicators */
+.equity-source-scraped {
+  border-color: var(--color-prop-blue) !important;
+  border-style: dashed !important;
+}
+
+.equity-source-estimated {
+  border-color: var(--color-prop-red) !important;
+  border-style: dashed !important;
+}
+
+.equity-label-clickable {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.equity-label-clickable:hover {
+  color: #3b82f6; /* blue-500 */
+  text-decoration: underline;
+}
