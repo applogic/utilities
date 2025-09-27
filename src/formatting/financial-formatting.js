@@ -169,106 +169,93 @@ export const calculateCursorPosition = (oldValue, newValue, oldCursor, type) => 
     if (type === "currency") {
       return newValue.length;
     } else {
-      const match = newValue.match(/^[0-9,.-\s]+/);
+      const match = newValue.match(/^[0-9,.\-\s]+/);
       return match ? match[0].length : 0;
     }
   }
   
-  // Extract the numeric content (without prefix/suffix) for analysis
-  const getNumericContent = (value, inputType) => {
-    let content = value;
-    let prefixLength = 0;
-    
-    // Remove prefix
-    if (inputType === "currency" && content.startsWith("$ ")) {
-      content = content.substring(2);
-      prefixLength = 2;
-    }
-    
-    // Remove suffix and find suffix start
-    let suffixStart = content.length;
-    if (inputType === "percent") {
-      const match = content.match(/^([0-9,.-]+)\s*%/);
-      if (match) {
-        content = match[1];
-        suffixStart = match[1].length;
-      }
-    } else if (inputType === "years") {
-      const match = content.match(/^([0-9,.-]+)\s*yrs\.?/);
-      if (match) {
-        content = match[1];
-        suffixStart = match[1].length;
-      }
-    } else if (inputType === "months") {
-      const match = content.match(/^([0-9,.-]+)\s*mos\.?/);
-      if (match) {
-        content = match[1];
-        suffixStart = match[1].length;
-      }
-    }
-    
-    return { content, prefixLength, suffixStart };
+  // Get prefix length for different input types
+  const getPrefixLength = (value, inputType) => {
+    if (inputType === "currency" && value.startsWith("$ ")) return 2;
+    return 0;
   };
   
-  const oldAnalysis = getNumericContent(oldValue, type);
-  const newAnalysis = getNumericContent(newValue, type);
-  
-  // Adjust cursor position to be relative to numeric content
-  const adjustedOldCursor = Math.max(0, oldCursor - oldAnalysis.prefixLength);
-  
-  // Detect the type of change by comparing character counts
-  const oldDigits = oldAnalysis.content.replace(/[^0-9.-]/g, '');
-  const newDigits = newAnalysis.content.replace(/[^0-9.-]/g, '');
-  
-  let newCursorInContent;
-  
-  if (newDigits.length > oldDigits.length) {
-    // INSERTION: Characters were added
-    const insertedCount = newDigits.length - oldDigits.length;
+  // Get the end of numeric content (before suffix)
+  const getContentEnd = (value, inputType, prefixLength) => {
+    const content = value.substring(prefixLength);
     
-    // Find how many significant characters were before cursor in old content
-    let significantCharsBefore = 0;
-    for (let i = 0; i < Math.min(adjustedOldCursor, oldAnalysis.content.length); i++) {
-      if (/[0-9.-]/.test(oldAnalysis.content[i])) {
-        significantCharsBefore++;
-      }
+    if (inputType === "percent") {
+      const match = content.match(/^([0-9,.\-]+)/);
+      return match ? match[1].length : content.length;
+    } else if (inputType === "years") {
+      const match = content.match(/^([0-9,.\-]+)/);
+      return match ? match[1].length : content.length;
+    } else if (inputType === "months") {
+      const match = content.match(/^([0-9,.\-]+)/);
+      return match ? match[1].length : content.length;
     }
     
-    // Position cursor after the inserted characters
-    const targetPosition = significantCharsBefore + insertedCount;
-    newCursorInContent = findPositionAfterNSignificantChars(newAnalysis.content, targetPosition);
-    
-  } else if (newDigits.length < oldDigits.length) {
-    // DELETION: Characters were removed
-    let significantCharsBefore = 0;
-    for (let i = 0; i < Math.min(adjustedOldCursor, oldAnalysis.content.length); i++) {
-      if (/[0-9.-]/.test(oldAnalysis.content[i])) {
-        significantCharsBefore++;
+    return content.length;
+  };
+  
+  const oldPrefixLength = getPrefixLength(oldValue, type);
+  const newPrefixLength = getPrefixLength(newValue, type);
+  
+  const oldContentEnd = getContentEnd(oldValue, type, oldPrefixLength);
+  const newContentEnd = getContentEnd(newValue, type, newPrefixLength);
+  
+  // Convert cursor position to be relative to numeric content
+  const cursorInOldContent = Math.max(0, oldCursor - oldPrefixLength);
+  const maxOldContentCursor = Math.min(cursorInOldContent, oldContentEnd);
+  
+  // Count logical position: how many significant characters before cursor
+  const oldContent = oldValue.substring(oldPrefixLength, oldPrefixLength + oldContentEnd);
+  let logicalPosition = 0;
+  
+  for (let i = 0; i < maxOldContentCursor; i++) {
+    const char = oldContent[i];
+    if (/[0-9.\-]/.test(char)) {
+      logicalPosition++;
+    }
+  }
+  
+  // Find physical position for this logical position in new content
+  const newContent = newValue.substring(newPrefixLength, newPrefixLength + newContentEnd);
+  let physicalPosition = 0;
+  let logicalCount = 0;
+  
+  // Scan through new content to find the target position
+  for (let i = 0; i < newContent.length; i++) {
+    const char = newContent[i];
+    if (/[0-9.\-]/.test(char)) {
+      logicalCount++;
+      
+      // If we've reached our target logical position
+      if (logicalCount === logicalPosition) {
+        // Look ahead to see if there's a comma after this character
+        if (i + 1 < newContent.length && newContent[i + 1] === ',') {
+          // Position cursor after the comma
+          physicalPosition = i + 2;
+        } else {
+          // Position cursor after this character
+          physicalPosition = i + 1;
+        }
+        break;
       }
     }
-    
-    // Position cursor at the same logical position (accounting for deletions)
-    newCursorInContent = findPositionAfterNSignificantChars(newAnalysis.content, significantCharsBefore);
-    
-  } else {
-    // SAME LENGTH: Either no change or character replacement
-    // Maintain relative position
-    let significantCharsBefore = 0;
-    for (let i = 0; i < Math.min(adjustedOldCursor, oldAnalysis.content.length); i++) {
-      if (/[0-9.-]/.test(oldAnalysis.content[i])) {
-        significantCharsBefore++;
-      }
-    }
-    
-    newCursorInContent = findPositionAfterNSignificantChars(newAnalysis.content, significantCharsBefore);
+  }
+  
+  // Handle case where we need position 0 (before any characters)
+  if (logicalPosition === 0) {
+    physicalPosition = 0;
   }
   
   // Convert back to full string position
-  const finalPosition = newAnalysis.prefixLength + newCursorInContent;
+  const finalPosition = newPrefixLength + physicalPosition;
   
-  // Ensure cursor doesn't go past content boundary
-  const maxPosition = newAnalysis.prefixLength + newAnalysis.suffixStart;
-  return Math.min(finalPosition, maxPosition);
+  // Ensure we don't exceed the content boundary
+  const maxAllowedPosition = newPrefixLength + newContentEnd;
+  return Math.min(finalPosition, maxAllowedPosition);
 };
 
 // Helper function to find position after N significant characters
