@@ -17,8 +17,8 @@ describe('Business Constants', () => {
       expect(ASSIGNMENT_FEE_PERCENTAGE).toBe(0.05);
       expect(NET_TO_BUYER_PERCENTAGE).toBe(0.10);
       expect(CLOSING_COSTS_PERCENTAGE).toBe(0.0125);
-      expect(BUSINESS_CONSTANTS.FINANCING_FEE_PERCENTAGE).toBe(0.03);
-      expect(BUSINESS_CONSTANTS.REHAB_PERCENTAGE).toBe(0.0);
+      expect(BUSINESS_CONSTANTS.HARD_MONEY_RATE).toBe(0.03);
+      expect(BUSINESS_CONSTANTS.REHAB_RATE).toBe(0.0);
     });
   });
 

@@ -7,12 +7,12 @@ export const BUSINESS_CONSTANTS = {
   ASSIGNMENT_FEE_PERCENTAGE: 0.05,    // 5% assignment fee
   NET_TO_BUYER_PERCENTAGE: 0.10,      // 10% net to buyer
   CLOSING_COSTS_PERCENTAGE: 0.0125,   // 1.25% closing costs
-  FINANCING_FEE_PERCENTAGE: 0.03,     // 3% financing fee
-  REHAB_PERCENTAGE: 0.0,              // 0% rehab fee
+  HARD_MONEY_RATE: 0.03,     // 3% financing fee
+  REHAB_RATE: 0.0,              // 0% rehab fee
   
   // Agent commissions
-  SELLER_AGENT_COMMISSION: 0.03,      // 3% seller agent commission
-  BUYER_AGENT_COMMISSION: 0.03,       // 3% buyer agent commission
+  SELLER_AGENT_COMMISSION: 0.025,      // 3% seller agent commission
+  BUYER_AGENT_COMMISSION: 0.025,       // 3% buyer agent commission
   
   // COCR15 price calculation limits
   MINIMUM_COCR15_PRICE: 10000,                    // $10,000 minimum
@@ -42,10 +42,11 @@ export const {
   ASSIGNMENT_FEE_PERCENTAGE,
   NET_TO_BUYER_PERCENTAGE,
   CLOSING_COSTS_PERCENTAGE,
-  FINANCING_FEE_PERCENTAGE,
+  HARD_MONEY_RATE,
   SELLER_AGENT_COMMISSION,
   BUYER_AGENT_COMMISSION,
   MINIMUM_COCR15_PRICE,
   MAX_COCR15_PRICE_MULTIPLIER,
-  CONSERVATIVE_COCR15_PRICE_MULTIPLIER
+  CONSERVATIVE_COCR15_PRICE_MULTIPLIER,
+  REHAB_RATE,
 } = BUSINESS_CONSTANTS;

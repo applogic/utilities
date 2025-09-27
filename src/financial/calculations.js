@@ -197,8 +197,8 @@ export function calculateNetToBuyer(askingPrice, options = {}) {
     buyerCostPercent = BUSINESS_CONSTANTS.NET_TO_BUYER_PERCENTAGE * 100,
     sellerCostAssignment = BUSINESS_CONSTANTS.ASSIGNMENT_FEE_PERCENTAGE * 100,
     sellerCostClosing = BUSINESS_CONSTANTS.CLOSING_COSTS_PERCENTAGE * 100,
-    additionalCostRehab = BUSINESS_CONSTANTS.REHAB_PERCENTAGE * 100,
-    additionalCostFinancing = BUSINESS_CONSTANTS.FINANCING_FEE_PERCENTAGE * 100,
+    additionalCostRehab = BUSINESS_CONSTANTS.REHAB_RATE * 100,
+    additionalCostFinancing = BUSINESS_CONSTANTS.HARD_MONEY_RATE * 100,
     dscrLtvPercent = FINANCIAL_CONSTANTS.DEFAULT_DSCR_PERCENTAGE * 100
   } = options;
 

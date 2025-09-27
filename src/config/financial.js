@@ -25,7 +25,7 @@ export const FINANCIAL_CONSTANTS = {
   
   // Cap rates
   DEFAULT_CAP_RATE: 0.05,            // 5% default cap rate
-  MAX_ESTIMATED_CAP_RATE: 20,        // 20% maximum cap rate
+  MAX_ESTIMATED_CAP_RATE: 25,        // 20% maximum cap rate
   
   // Market assumptions
   APPRECIATION_RATE: 0.045,          // 4.5% annual appreciation
