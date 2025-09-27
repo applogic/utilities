@@ -24,8 +24,8 @@ describe('Business Constants', () => {
 
   describe('Agent commissions', () => {
     test('should have standard commission rates', () => {
-      expect(SELLER_AGENT_COMMISSION).toBe(0.03);
-      expect(BUSINESS_CONSTANTS.BUYER_AGENT_COMMISSION).toBe(0.03);
+      expect(SELLER_AGENT_COMMISSION).toBe(0.025);
+      expect(BUSINESS_CONSTANTS.BUYER_AGENT_COMMISSION).toBe(0.025);
     });
   });
 

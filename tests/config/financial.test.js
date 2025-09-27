@@ -53,7 +53,7 @@ describe('Financial Constants', () => {
   describe('Cap rates', () => {
     test('should have reasonable cap rate values', () => {
       expect(DEFAULT_CAP_RATE).toBe(0.05);
-      expect(FINANCIAL_CONSTANTS.MAX_ESTIMATED_CAP_RATE).toBe(20);
+      expect(FINANCIAL_CONSTANTS.MAX_ESTIMATED_CAP_RATE).toBe(25);
       expect(DEFAULT_CAP_RATE).toBeGreaterThan(0);
       expect(DEFAULT_CAP_RATE).toBeLessThan(1);
     });
