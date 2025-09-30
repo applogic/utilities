@@ -232,9 +232,12 @@ export const calculateCursorPosition = (oldValue, newValue, oldCursor, type) => 
       
       // If we've reached our target logical position
       if (logicalCount === logicalPosition) {
-        // Look ahead to see if there's a comma after this character
+        // Look ahead to see if there's a comma or decimal after this character
         if (i + 1 < newContent.length && newContent[i + 1] === ',') {
           // Position cursor after the comma
+          physicalPosition = i + 2;
+        } else if (i + 1 < newContent.length && newContent[i + 1] === '.') {
+          // Position cursor after the decimal point
           physicalPosition = i + 2;
         } else {
           // Position cursor after this character
@@ -242,6 +245,7 @@ export const calculateCursorPosition = (oldValue, newValue, oldCursor, type) => 
         }
         break;
       }
+
     }
   }
   
