@@ -1,3 +1,30 @@
+/**
+ * src/financial/formatters.js
+ * 
+ * OUTPUT/DISPLAY FORMATTERS - For read-only display of financial data
+ * 
+ * Purpose: Format calculated financial values for compact, readable display
+ * Use cases:
+ *   - Browser extension metrics and tooltips
+ *   - Dashboard display values
+ *   - Comparison pages
+ *   - Any read-only financial data presentation
+ * 
+ * Characteristics:
+ *   - Uses K/M notation for compact display (e.g., "$2.5M", "$125K")
+ *   - Optimized for space-constrained UI elements
+ *   - Not for user input fields (see formatting/financial-formatting.js)
+ * 
+ * Related files:
+ *   - formatting/financial-formatting.js: Input formatters for editable fields
+ */
+
+/**
+ * Format currency with K/M notation for compact display
+ * @param {number} amount - The amount to format
+ * @param {boolean} isMonthly - If true, shows full amount with commas (for monthly payments)
+ * @returns {string} Formatted currency string (e.g., "$2.5M", "$125K", "$1,234")
+ */
 export function formatCurrency(amount, isMonthly = false) {
   if (isNaN(amount) || !isFinite(amount)) return "N/A";
   
@@ -6,18 +33,14 @@ export function formatCurrency(amount, isMonthly = false) {
   const prefix = isNegative ? "-$" : "$";
   
   if (isMonthly) {
-    // For monthly payments, show full amount with commas
     return prefix + absAmount.toLocaleString("en-US", { maximumFractionDigits: 0 });
   } else {
-    // For larger amounts, use K/M notation with 2-3 decimal places as needed
     if (absAmount >= 1000000) {
       const millions = absAmount / 1000000;
-      // Use 2-3 decimal places but remove unnecessary trailing zeros
       const formatted = millions.toFixed(3).replace(/\.?0+$/, "");
       return prefix + formatted + "M";
     } else if (absAmount >= 1000) {
       const thousands = absAmount / 1000;
-      // Use 2-3 decimal places but remove unnecessary trailing zeros  
       const formatted = thousands.toFixed(3).replace(/\.?0+$/, "");
       return prefix + formatted + "K";
     } else {
@@ -26,6 +49,12 @@ export function formatCurrency(amount, isMonthly = false) {
   }
 }
 
+/**
+ * Format price value with K/M notation for compact display
+ * Similar to formatCurrency but with fixed decimal places
+ * @param {number} amount - The amount to format
+ * @returns {string} Formatted price string (e.g., "$2.5M", "$125K")
+ */
 export function formatPriceValue(amount) {
   if (isNaN(amount) || !isFinite(amount)) return "N/A";
   
@@ -42,8 +71,12 @@ export function formatPriceValue(amount) {
   }
 }
 
+/**
+ * Format percentage for display
+ * @param {number} percentage - The percentage value to format (e.g., 7.5 for 7.5%)
+ * @returns {string} Formatted percentage string (e.g., "7.5%")
+ */
 export function formatPercentage(percentage) {
   if (isNaN(percentage) || !isFinite(percentage)) return "N/A";
   return percentage.toFixed(1) + "%";
 }
-

@@ -1,3 +1,33 @@
+/**
+ * src/formatting/financial-formatting.js
+ * 
+ * INPUT FORMATTERS - For live user input in editable fields
+ * 
+ * Purpose: Handle real-time formatting and validation of user input in form fields
+ * Use cases:
+ *   - FormattedInput React components
+ *   - Property dashboard input fields
+ *   - Any editable financial input that requires live formatting
+ * 
+ * Characteristics:
+ *   - Formats with full numbers and thousand separators (e.g., "$2,500,000", "$125,000")
+ *   - Handles cursor positioning during live typing
+ *   - Preserves user typing experience with appropriate decimal handling
+ *   - Input validation and filtering
+ *   - Not for display-only values (see financial/formatters.js)
+ * 
+ * Key functions:
+ *   - formatInputDisplay: Final formatted display of input values
+ *   - formatLiveInput: Real-time formatting as user types
+ *   - formatLiveNumber: Core number formatting with comma insertion
+ *   - calculateCursorPosition: Maintains cursor position during formatting
+ *   - filterNumericInput: Input validation and sanitization
+ *   - extractNumericValue: Parse formatted strings back to numbers
+ * 
+ * Related files:
+ *   - financial/formatters.js: Output formatters for read-only display
+ */
+
 // Enhanced formatting for input fields
 export const formatInputDisplay = (value, type) => {
   const num = parseFloat(value) || 0;
