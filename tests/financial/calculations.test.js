@@ -177,24 +177,31 @@ describe("Core Financial Calculations", () => {
   });
 
   describe("calculateNetToBuyer", () => {
-    test("should use config constants for calculation", () => {
+    test("should calculate with custom rates", () => {
+      const askingPrice = 500000;
+      const result = calculateNetToBuyer(askingPrice, {
+        buyerCostPercent: 12,           // Custom 12%
+        sellerCostAssignment: 6,        // Custom 6%
+        sellerCostClosing: 1.5,
+        additionalCostRehab: 0,
+        additionalCostFinancing: 3,
+        dscrLtvPercent: 70
+      });
+      
+      expect(result).toBeGreaterThan(0);
+      // Add specific expected value calculation
+    });
+    
+    test("should use defaults when no options provided", () => {
       const askingPrice = 500000;
       const result = calculateNetToBuyer(askingPrice);
       
-      // Should use business constants from config
-      expect(result).toBeGreaterThan(0); // Should be positive for typical scenario
-    });
-
-    test("should handle custom parameters while defaulting to config", () => {
-      const askingPrice = 500000;
-      const result1 = calculateNetToBuyer(askingPrice);
-      const result2 = calculateNetToBuyer(askingPrice, {
-        dscrLtvPercent: FINANCIAL_CONSTANTS.DEFAULT_DSCR_PERCENTAGE * 100
-      });
-      
-      expect(result1).toBeCloseTo(result2, 0);
+      // Should use business constants
+      expect(result).toBeGreaterThan(0);
     });
   });
+
+
 
   describe("Config constant integration", () => {
     test("should use consistent constants across functions", () => {

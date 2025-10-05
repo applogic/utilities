@@ -6,6 +6,7 @@
   --color-danger: #dc3545;
   --color-warning: #ffc107;
   --color-info: #17a2b8;
+  --color-warning-background: #ffc10725;
 
 
 
@@ -161,22 +162,4 @@
   /* Grid */
   --grid-gap: var(--spacing-xl);
   --grid-gap-small: var(--spacing-lg);
-}
-
-/* Test class */
-.test-styles {
-  background: var(--color-primary);
-  color: white;
-  padding: var(--spacing-xl) var(--spacing-xxxl);
-  border-radius: var(--border-radius);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-  border: 1px solid var(--border-color);
-  cursor: pointer;
-  display: inline-block;
-  text-decoration: none;
-}
-
-.test-styles:hover {
-  background: var(--color-primary-hover);
 }

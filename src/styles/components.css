@@ -97,6 +97,10 @@
   color: var(--color-dark-red) !important;
 }
 
+#property-card.cash-flow-negative {
+  background-color: var(--color-warning-background) !important;
+}
+
 .cash-flow-negative .red-if-negative:hover {
   color: var(--color-dark-red-hover) !important;
 }
