@@ -29,6 +29,7 @@ export const FINANCIAL_CONSTANTS = {
   
   // Market assumptions
   APPRECIATION_RATE: 0.045,          // 4.5% annual appreciation
+  NOI_APPRECIATION: 0.02,           // 2% annual NOI appreciation
 };
 
 // Convenience exports for common calculations

@@ -101,6 +101,19 @@
   background-color: var(--color-warning-background) !important;
 }
 
+@keyframes danger-flash {
+  0% { background-color: inherit; }
+  25% { background-color: var(--color-warning-background); }
+  50% { background-color: inherit; }
+  75% { background-color: var(--color-warning-background); }
+  100% { background-color: inherit; }
+}
+
+.danger-flash {
+  animation: danger-flash 0.6s ease-in-out;
+}
+
+
 .cash-flow-negative .red-if-negative:hover {
   color: var(--color-dark-red-hover) !important;
 }
