@@ -12,13 +12,31 @@ handle_error() {
 # Trap errors and report the line number
 trap 'handle_error $LINENO' ERR
 
-# Read argument (default = patch)
-RELEASE_TYPE=${1:-none}
+# Default values
+RELEASE_TYPE="none"
+SKIP_TESTS=false
 
-# Validate input
+# Parse arguments
+for arg in "$@"; do
+  case $arg in
+    patch|minor|major)
+      RELEASE_TYPE=$arg
+      ;;
+    --skip-tests)
+      SKIP_TESTS=true
+      ;;
+    *)
+      echo "Invalid argument: $arg"
+      echo "Usage: ./deploy.sh [patch|minor|major] [--skip-tests]"
+      exit 1
+      ;;
+  esac
+done
+
+# Validate release type
 if [[ "$RELEASE_TYPE" != "patch" && "$RELEASE_TYPE" != "minor" && "$RELEASE_TYPE" != "major" ]]; then
-  echo "Invalid release type: $RELEASE_TYPE"
-  echo "Usage: ./deploy.sh [patch|minor|major]"
+  echo "Missing or invalid release type."
+  echo "Usage: ./deploy.sh [patch|minor|major] [--skip-tests]"
   exit 1
 fi
 
@@ -28,10 +46,15 @@ fi
 echo "Running npm build..."
 npm run build
 
-echo "Running tests..."
-npm test
+if [ "$SKIP_TESTS" = false ]; then
+  echo "Running tests..."
+  npm test
+  echo "All tests passed!"
+else
+  echo "Skipping tests due to --skip-tests flag."
+fi
 
-echo "All tests passed! Releasing $RELEASE_TYPE version..."
+echo "Releasing $RELEASE_TYPE version..."
 npm run release:$RELEASE_TYPE
 
 echo "Deployment completed successfully!"
