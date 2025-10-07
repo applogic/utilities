@@ -53,3 +53,7 @@ export * from './config/property-types.js';
 export * from './config/business.js';
 
 export const STYLES_PATH = './dist/styles/base.css';
+
+// LOI Lookup service and config
+export { lookupLOI } from "./services/loi-lookup.js";
+export { LOI_LOOKUP_CONFIG, MATCH_TYPES, LOI_SENT_STATUS } from "./config/loi-lookup.js";

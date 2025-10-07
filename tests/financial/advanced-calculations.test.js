@@ -2,13 +2,23 @@
  * Tests for advanced financial calculations
  */
 
+import { describe, test, expect } from "vitest";
 import { 
-  calculateBalloonBalance,
   calculateAppreciatedValue,
-  calculateCashOutAfterRefi
+  calculateBalloonBalance,
+  calculateCashFlowYield,
+  calculateCashOutAfterRefi,
+  calculateDiscountFromPrice,
+  calculatePriceFromDiscount,
+  safePercentage,
+  calculateCOCR30,
+  calculateDscrPayment,
+  calculateSfPayment,
+  calculateCashFlow
 } from "../../src/financial/calculations.js";
 
-import { FINANCIAL_CONSTANTS } from '../../src/config/financial.js';
+import { FINANCIAL_CONSTANTS } from "../../src/config/financial.js";
+
 
 describe("Advanced Financial Calculations", () => {
   describe("calculateBalloonBalance", () => {
@@ -201,6 +211,259 @@ describe("Advanced Financial Calculations", () => {
       const cashOut = calculateCashOutAfterRefi(purchasePrice, dscrLoanAmount, sellerFiAmount);
       expect(typeof cashOut).toBe('number');
       expect(isFinite(cashOut)).toBe(true);
+    });
+  });
+});
+
+describe("Advanced Financial Calculations", () => {
+  describe("calculateBalloonBalance", () => {
+    test("should calculate remaining balance after balloon period", () => {
+      const loanAmount = 500000;
+      const rate = 0.075;
+      const amortization = 30;
+      const balloonYears = 7;
+      
+      const result = calculateBalloonBalance(loanAmount, rate, amortization, balloonYears);
+      
+      // After 7 years of 30-year amortization at 7.5%
+      expect(result).toBeCloseTo(444635, 0);
+    });
+
+    test("should handle zero interest rate", () => {
+      const result = calculateBalloonBalance(100000, 0, 30, 5);
+      
+      // With 0% interest, balance reduces linearly
+      const monthlyPrincipal = 100000 / (30 * 12);
+      const paidOff = monthlyPrincipal * (5 * 12);
+      
+      expect(result).toBeCloseTo(100000 - paidOff, 0);
+    });
+
+    test("should handle balloon period equal to amortization", () => {
+      const result = calculateBalloonBalance(100000, 0.06, 10, 10);
+      expect(result).toBeCloseTo(0, 0); // Fully paid off
+    });
+
+    test("should handle balloon period longer than amortization", () => {
+      const result = calculateBalloonBalance(100000, 0.06, 10, 15);
+      expect(result).toBe(0); // Already paid off
+    });
+
+    test("should handle invalid inputs", () => {
+      expect(calculateBalloonBalance(-100000, 0.06, 30, 7)).toBe(0);
+      expect(calculateBalloonBalance(100000, -0.06, 30, 7)).toBe(0);
+      expect(calculateBalloonBalance(100000, 0.06, 0, 7)).toBe(0);
+    });
+  });
+
+  describe("calculateAppreciatedValue", () => {
+    test("should calculate appreciation with default rate", () => {
+      const currentValue = 500000;
+      const result = calculateAppreciatedValue(currentValue);
+      
+      // Default 4.5% for 7 years
+      const expected = 500000 * Math.pow(1.045, 7);
+      expect(result).toBeCloseTo(expected, 0);
+    });
+
+    test("should handle custom appreciation rates and periods", () => {
+      const currentValue = 500000;
+      const result1yr = calculateAppreciatedValue(currentValue, 0.05, 1);
+      const result2yr = calculateAppreciatedValue(currentValue, 0.05, 2);
+      
+      expect(result1yr).toBeCloseTo(525000, 0); // 500k * 1.05
+      expect(result2yr).toBeCloseTo(551250, 0); // 500k * 1.05^2
+    });
+
+    test("should handle zero appreciation", () => {
+      const result = calculateAppreciatedValue(500000, 0, 5);
+      expect(result).toBe(500000);
+    });
+
+    test("should handle negative appreciation (depreciation)", () => {
+      const result = calculateAppreciatedValue(500000, -0.02, 5);
+      expect(result).toBeLessThan(500000);
+    });
+
+    test("should handle invalid inputs", () => {
+      expect(calculateAppreciatedValue(0, 0.05, 5)).toBe(0);
+      expect(calculateAppreciatedValue(-500000, 0.05, 5)).toBe(-500000);
+      expect(calculateAppreciatedValue(500000, 0.05, -5)).toBe(500000);
+    });
+  });
+
+  describe("calculateCashOutAfterRefi", () => {
+    test("should calculate positive cash out correctly", () => {
+      const originalPrice = 500000;
+      const dscrLoan = 350000; // 70%
+      const sellerFi = 100000; // 20%, 10% down
+      
+      const result = calculateCashOutAfterRefi(originalPrice, dscrLoan, sellerFi);
+      
+      // After 7 years with 4.5% appreciation, should have positive cash out
+      expect(result).toBeGreaterThan(0);
+    });
+
+    test("should handle case with only DSCR loan", () => {
+      const originalPrice = 500000;
+      const dscrLoan = 350000;
+      const sellerFi = 0;
+      
+      const result = calculateCashOutAfterRefi(originalPrice, dscrLoan, sellerFi);
+      
+      expect(result).toBeGreaterThan(0);
+    });
+
+    test("should handle negative cash out (cash in required)", () => {
+      const originalPrice = 500000;
+      const dscrLoan = 450000; // High leverage
+      const sellerFi = 50000;
+      
+      const result = calculateCashOutAfterRefi(originalPrice, dscrLoan, sellerFi, {
+        appreciationRate: 0.01 // Low appreciation
+      });
+      
+      expect(typeof result).toBe("number");
+    });
+  });
+
+  describe("calculateCashFlowYield", () => {
+    test("should calculate annual yield from monthly cash flow", () => {
+      const monthlyCashFlow = 1000;
+      const downPayment = 100000;
+      
+      const result = calculateCashFlowYield(monthlyCashFlow, downPayment);
+      
+      // (1000 * 12) / 100000 = 0.12
+      expect(result).toBe(0.12);
+    });
+
+    test("should handle zero down payment", () => {
+      const result = calculateCashFlowYield(1000, 0);
+      expect(result).toBe(0);
+    });
+
+    test("should handle negative cash flow", () => {
+      const result = calculateCashFlowYield(-500, 100000);
+      expect(result).toBe(-0.06);
+    });
+
+    test("should handle invalid inputs", () => {
+      expect(calculateCashFlowYield(NaN, 100000)).toBe(0);
+      expect(calculateCashFlowYield(1000, null)).toBe(0);
+    });
+  });
+
+  describe("calculateCOCR30", () => {
+    test("should calculate 30% down COCR correctly", () => {
+      const askingPrice = 500000;
+      const noi = 40000;
+      
+      const result = calculateCOCR30(askingPrice, noi);
+      
+      // Should calculate COCR with 30% down
+      expect(result).toBeGreaterThan(0);
+      expect(result).toBeLessThan(1);
+    });
+
+    test("should handle edge cases", () => {
+      expect(calculateCOCR30(0, 40000)).toBe(0);
+      expect(calculateCOCR30(500000, 0)).toBeCloseTo(0, 2);
+      expect(calculateCOCR30(500000, -40000)).toBeLessThan(0);
+    });
+  });
+
+  describe("Price Discount Calculations", () => {
+    test("should calculate discount from price correctly", () => {
+      const askingPrice = 1000000;
+      
+      expect(calculateDiscountFromPrice(askingPrice, 900000)).toBeCloseTo(0.10, 2);
+      expect(calculateDiscountFromPrice(askingPrice, 800000)).toBeCloseTo(0.20, 2);
+      expect(calculateDiscountFromPrice(askingPrice, 1000000)).toBe(0);
+      expect(calculateDiscountFromPrice(askingPrice, 1100000)).toBeCloseTo(-0.10, 2);
+    });
+
+    test("should calculate price from discount correctly", () => {
+      const askingPrice = 1000000;
+      
+      expect(calculatePriceFromDiscount(askingPrice, 0.10)).toBe(900000);
+      expect(calculatePriceFromDiscount(askingPrice, 0.20)).toBe(800000);
+      expect(calculatePriceFromDiscount(askingPrice, 0)).toBe(1000000);
+      expect(calculatePriceFromDiscount(askingPrice, -0.10)).toBe(1100000);
+    });
+
+    test("should handle invalid asking prices", () => {
+      expect(calculateDiscountFromPrice(0, 900000)).toBe(0);
+      expect(calculateDiscountFromPrice(null, 900000)).toBe(0);
+      expect(calculatePriceFromDiscount(0, 0.10)).toBe(0);
+      expect(calculatePriceFromDiscount(-1000000, 0.10)).toBe(0);
+    });
+  });
+
+  describe("safePercentage", () => {
+    test("should convert decimals to percentages", () => {
+      expect(safePercentage(0.075)).toBe(7.5);
+      expect(safePercentage(0.25)).toBe(25);
+      expect(safePercentage(1)).toBe(100);
+    });
+
+    test("should use fallback for invalid values", () => {
+      expect(safePercentage(null)).toBe(100);
+      expect(safePercentage(undefined)).toBe(100);
+      expect(safePercentage(NaN)).toBe(100);
+      expect(safePercentage(null, 50)).toBe(50);
+    });
+
+    test("should handle zero correctly", () => {
+      expect(safePercentage(0)).toBe(0);
+    });
+  });
+
+  describe("Payment Calculations", () => {
+    test("calculateDscrPayment should calculate correctly", () => {
+      const askingPrice = 500000;
+      const dscrPercent = 70;
+      const dscrRate = 0.075;
+      const dscrAmortization = 30;
+      
+      const result = calculateDscrPayment(askingPrice, dscrPercent, dscrRate, dscrAmortization);
+      
+      // DSCR loan is 70% of 500k = 350k
+      const expectedPayment = calculatePMT(350000, 0.075, 30);
+      expect(result).toBeCloseTo(expectedPayment, 2);
+    });
+
+    test("calculateSfPayment should calculate correctly", () => {
+      const askingPrice = 500000;
+      const sellerFiPercent = 30;
+      const sellerFiRate = 0;
+      const sellerFiAmortization = 30;
+      
+      const result = calculateSfPayment(askingPrice, sellerFiPercent, sellerFiRate, sellerFiAmortization);
+      
+      // SF loan is 30% of 500k = 150k at 0%
+      const expectedPayment = calculatePMT(150000, 0, 30);
+      expect(result).toBeCloseTo(expectedPayment, 2);
+    });
+
+    test("calculateCashFlow should subtract payments from NOI", () => {
+      const monthlyNOI = 5000;
+      const dscrPayment = 2500;
+      const sfPayment = 500;
+      
+      const result = calculateCashFlow(monthlyNOI, dscrPayment, sfPayment);
+      
+      expect(result).toBe(2000);
+    });
+
+    test("calculateCashFlow should handle negative cash flow", () => {
+      const monthlyNOI = 3000;
+      const dscrPayment = 2500;
+      const sfPayment = 1000;
+      
+      const result = calculateCashFlow(monthlyNOI, dscrPayment, sfPayment);
+      
+      expect(result).toBe(-500);
     });
   });
 });
