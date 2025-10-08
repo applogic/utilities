@@ -119,6 +119,7 @@ function matchAddresses(searchQuery, opportunityAddress) {
 
 /**
  * Parse CSV text into array of objects
+ * Handles quoted fields with commas correctly
  * @param {string} csvText - CSV content
  * @returns {Array<Object>} Parsed rows
  */
@@ -127,9 +128,26 @@ function parseCSV(csvText) {
   if (lines.length === 0) return [];
   
   const rows = [];
+  
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
-    const cols = line.split(",").map(col => col.trim().replace(/^"|"$/g, ""));
+    const cols = [];
+    let current = "";
+    let inQuotes = false;
+    
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
+      
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === "," && !inQuotes) {
+        cols.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    cols.push(current.trim());
     
     if (cols.length >= 4 && cols[1]) {
       rows.push({
