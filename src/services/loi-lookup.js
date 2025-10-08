@@ -15,8 +15,8 @@ function normalizeAddress(address) {
   
   return address
     .toLowerCase()
-    .replace(/[^\w\s]/g, " ") // Replace punctuation with spaces
-    .replace(/\s+/g, " ")      // Collapse multiple spaces
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -28,19 +28,15 @@ function normalizeAddress(address) {
 function parseAddress(address) {
   const normalized = normalizeAddress(address);
   
-  // Extract zip code (5 digits)
   const zipMatch = normalized.match(/\b\d{5}\b/);
   const zip = zipMatch ? zipMatch[0] : null;
   
-  // Extract state (2 letter code before zip)
   const stateMatch = normalized.match(/\b([a-z]{2})\s+\d{5}\b/);
   const state = stateMatch ? stateMatch[1] : null;
   
-  // Extract city (word(s) before state)
   const cityMatch = normalized.match(/([a-z\s]+)\s+[a-z]{2}\s+\d{5}/);
   const city = cityMatch ? cityMatch[1].trim() : null;
   
-  // Street address is everything before city
   const streetMatch = normalized.match(/^(.+?)\s+[a-z\s]+\s+[a-z]{2}\s+\d{5}/);
   const street = streetMatch ? streetMatch[1].trim() : normalized;
   
@@ -65,13 +61,10 @@ function calculateSimilarity(str1, str2) {
   const s1 = normalizeAddress(str1);
   const s2 = normalizeAddress(str2);
   
-  // Exact match
   if (s1 === s2) return 1.0;
   
-  // Contains match
   if (s1.includes(s2) || s2.includes(s1)) return 0.8;
   
-  // Word overlap
   const words1 = s1.split(" ").filter(w => w.length > 2);
   const words2 = s2.split(" ").filter(w => w.length > 2);
   
@@ -93,36 +86,30 @@ function matchAddresses(searchQuery, opportunityAddress) {
   const search = parseAddress(searchQuery);
   const opportunity = parseAddress(opportunityAddress);
   
-  // Check for city match if both present
   if (search.city && opportunity.city) {
     if (search.city !== opportunity.city) {
       return { matchType: MATCH_TYPES.NO_MATCH, score: 0 };
     }
   }
   
-  // Check for zip code match if both present
   if (search.zip && opportunity.zip) {
     if (search.zip !== opportunity.zip) {
       return { matchType: MATCH_TYPES.NO_MATCH, score: 0 };
     }
   }
   
-  // Check for state match if both present
   if (search.state && opportunity.state) {
     if (search.state !== opportunity.state) {
       return { matchType: MATCH_TYPES.NO_MATCH, score: 0 };
     }
   }
   
-  // Calculate overall similarity
   const similarity = calculateSimilarity(searchQuery, opportunityAddress);
   
-  // Exact match threshold
   if (similarity >= 0.95) {
     return { matchType: MATCH_TYPES.EXACT, score: similarity };
   }
   
-  // Fuzzy match threshold
   if (similarity >= 0.6) {
     return { matchType: MATCH_TYPES.FUZZY, score: similarity };
   }
@@ -131,19 +118,108 @@ function matchAddresses(searchQuery, opportunityAddress) {
 }
 
 /**
- * Lookup LOI status for a property address
+ * Parse CSV text into array of objects
+ * @param {string} csvText - CSV content
+ * @returns {Array<Object>} Parsed rows
+ */
+function parseCSV(csvText) {
+  const lines = csvText.split("\n").filter(line => line.trim());
+  if (lines.length === 0) return [];
+  
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    const cols = line.split(",").map(col => col.trim().replace(/^"|"$/g, ""));
+    
+    if (cols.length >= 4 && cols[1]) {
+      rows.push({
+        address: cols[1],
+        contactName: cols[3] || null,
+        date: cols[2] || null,
+      });
+    }
+  }
+  
+  return rows;
+}
+
+/**
+ * Lookup LOI from Google Spreadsheet
+ * DELETE THIS FUNCTION when phasing out spreadsheet
  * @param {string} searchQuery - Property address to search
  * @returns {Promise<Object>} Lookup result
  */
-export async function lookupLOI(searchQuery) {
-  if (!searchQuery) {
+async function lookupFromSpreadsheet(searchQuery) {
+  try {
+    const response = await fetch(LOI_LOOKUP_CONFIG.SPREADSHEET_URL, {
+      headers: {
+        "Accept": "text/csv",
+      },
+      method: "GET",
+    });
+    
+    if (!response.ok) {
+      return {
+        data: null,
+        matchType: MATCH_TYPES.NO_RESPONSE,
+        searchQuery,
+      };
+    }
+    
+    const csvText = await response.text();
+    const rows = parseCSV(csvText);
+    
+    let bestMatch = null;
+    let bestScore = 0;
+    
+    for (const row of rows) {
+      const matchResult = matchAddresses(searchQuery, row.address);
+      
+      if (matchResult.matchType !== MATCH_TYPES.NO_MATCH && matchResult.score > bestScore) {
+        bestScore = matchResult.score;
+        bestMatch = {
+          data: {
+            contactName: row.contactName,
+            createdAt: row.date,
+            opportunityAddress: row.address,
+            opportunityName: row.address,
+            statusOrStage: LOI_LOOKUP_CONFIG.LOI_SENT_STATUS,
+            updatedAt: row.date,
+          },
+          matchType: matchResult.matchType,
+          score: matchResult.score,
+          searchQuery,
+        };
+      }
+    }
+    
+    if (bestMatch) {
+      return bestMatch;
+    }
+    
     return {
       data: null,
+      matchType: MATCH_TYPES.NO_MATCH,
+      searchQuery,
+    };
+    
+  } catch (error) {
+    return {
+      data: null,
+      error: error.message,
       matchType: MATCH_TYPES.NO_RESPONSE,
       searchQuery,
     };
   }
-  
+}
+
+/**
+ * Lookup LOI from API
+ * This function will remain after spreadsheet is phased out
+ * @param {string} searchQuery - Property address to search
+ * @returns {Promise<Object>} Lookup result
+ */
+async function lookupFromAPI(searchQuery) {
   try {
     const url = new URL(LOI_LOOKUP_CONFIG.API_BASE_URL);
     url.pathname = LOI_LOOKUP_CONFIG.WEBHOOK_PATH;
@@ -168,7 +244,6 @@ export async function lookupLOI(searchQuery) {
     
     const data = await response.json();
     
-    // Check if response has required fields
     if (!data || !data.opportunityName) {
       return {
         data: null,
@@ -177,10 +252,8 @@ export async function lookupLOI(searchQuery) {
       };
     }
     
-    // Extract address from opportunityName (format: "ADDRESS + CONTACT_NAME")
     const opportunityAddress = data.opportunityName.split("+")[0].trim();
     
-    // Perform fuzzy matching
     const matchResult = matchAddresses(searchQuery, opportunityAddress);
     
     return {
@@ -205,4 +278,26 @@ export async function lookupLOI(searchQuery) {
       searchQuery,
     };
   }
+}
+
+/**
+ * Lookup LOI status for a property address
+ * @param {string} searchQuery - Property address to search
+ * @returns {Promise<Object>} Lookup result
+ */
+export async function lookupLOI(searchQuery) {
+  if (!searchQuery) {
+    return {
+      data: null,
+      matchType: MATCH_TYPES.NO_RESPONSE,
+      searchQuery,
+    };
+  }
+  
+  const spreadsheetResult = await lookupFromSpreadsheet(searchQuery);
+  if (spreadsheetResult.matchType !== MATCH_TYPES.NO_MATCH && spreadsheetResult.matchType !== MATCH_TYPES.NO_RESPONSE) {
+    return spreadsheetResult;
+  }
+  
+  return await lookupFromAPI(searchQuery);
 }
