@@ -7,6 +7,7 @@
 export { 
   calculateAppreciatedValue,
   calculateAssignmentFee,
+  calculateAssignmentFeeFromDecimal,
   calculateBalloonBalance,
   calculateCashFlow,
   calculateCashFlowYield,
@@ -14,12 +15,15 @@ export {
   calculateCOCR30, 
   calculateCOCRAtPercent,
   calculateDiscountFromPrice,
+  calculateDscrMonthlyPayment,
   calculateDscrPayment,
+  calculateMonthlyCashFlow,
   calculateNetToBuyer,
   calculateNOIByType,
   calculatePMT, 
   calculatePriceForCOCR,
   calculatePriceFromDiscount,
+  calculateSellerFiMonthlyPayment,
   calculateSfPayment,
   safePercentage,
 } from "./financial/calculations.js";
