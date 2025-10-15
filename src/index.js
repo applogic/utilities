@@ -7,7 +7,6 @@
 export { 
   calculateAppreciatedValue,
   calculateAssignmentFee,
-  calculateAssignmentFeeFromDecimal,
   calculateBalloonBalance,
   calculateCashFlow,
   calculateCashFlowYield,
@@ -15,15 +14,12 @@ export {
   calculateCOCR30, 
   calculateCOCRAtPercent,
   calculateDiscountFromPrice,
-  calculateDscrMonthlyPayment,
   calculateDscrPayment,
-  calculateMonthlyCashFlow,
   calculateNetToBuyer,
   calculateNOIByType,
   calculatePMT, 
   calculatePriceForCOCR,
   calculatePriceFromDiscount,
-  calculateSellerFiMonthlyPayment,
   calculateSfPayment,
   safePercentage,
 } from "./financial/calculations.js";
@@ -61,3 +57,10 @@ export const STYLES_PATH = './dist/styles/base.css';
 // LOI Lookup service and config
 export { lookupLOI } from "./services/loi-lookup.js";
 export { LOI_LOOKUP_CONFIG, MATCH_TYPES, LOI_SENT_STATUS } from "./config/loi-lookup.js";
+
+// Environment utilities
+export { 
+  getEnvVar, 
+  isNodeEnvironment, 
+  isBrowserEnvironment 
+} from "./environment/utilities.js";

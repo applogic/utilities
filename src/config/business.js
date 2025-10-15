@@ -2,6 +2,8 @@
  * Business logic and fee constants
  */
 
+import { getEnvVar } from "../environment/utilities.js";
+
 export const BUSINESS_CONSTANTS = {
   // Assignment and transaction fees
   ASSIGNMENT_FEE_PERCENTAGE: 0.05,    // 5% assignment fee
@@ -29,11 +31,16 @@ export const BUSINESS_CONSTANTS = {
 
 
   
-  // URL constants
-  EXPORT_URL_BASE: "https://app.archerjessop.com/property-dashboard/import",
+  // URL constants - safe for both Node.js and browser
+  EXPORT_URL_BASE: getEnvVar(
+    "EXPORT_URL_BASE",
+    "https://app.archerjessop.com/property-dashboard/import"
+  ),
   EXCLUDED_EXPORT_VALUES: ["Loading...", "Not found", "", null, undefined],
-
-  DASHBOARD_URL_BASE: "https://app.archerjessop.com/property-dashboard/",
+  DASHBOARD_URL_BASE: getEnvVar(
+    "DASHBOARD_URL_BASE",
+    "https://app.archerjessop.com/property-dashboard/"
+  ),
   
 };
 
