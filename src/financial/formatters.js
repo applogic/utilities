@@ -75,8 +75,28 @@ export function formatPriceValue(amount) {
  * Format percentage for display
  * @param {number} percentage - The percentage value to format (e.g., 7.5 for 7.5%)
  * @returns {string} Formatted percentage string (e.g., "7.5%")
+ * 
  */
 export function formatPercentage(percentage) {
   if (isNaN(percentage) || !isFinite(percentage)) return "N/A";
-  return percentage.toFixed(1) + "%";
+
+  // Convert to string with enough decimals
+  let str = percentage.toString();
+
+  if (str.includes("e")) {
+    // Handle scientific notation
+    str = Number(str).toFixed(2 + 10);
+  }
+
+  // Split integer and decimal parts
+  const [intPart, decPart = ""] = str.split(".");
+
+  // Take up to 2 decimals without rounding
+  const truncatedDec = decPart.slice(0, 2);
+
+  // Combine and remove trailing zeros
+  const combined = truncatedDec ? `${intPart}.${truncatedDec}` : intPart;
+  const cleaned = combined.replace(/\.?0+$/, "");
+
+  return cleaned + "%";
 }
