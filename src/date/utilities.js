@@ -2,7 +2,14 @@
  * DATE utilities
  */
 
-export function calculateDOM(listingDateText) {
+export function formatDate(date) {
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  const year = date.getFullYear();
+  return `${month}/${day}/${year}`;
+}
+
+export function calculateDOM(listingDateText, returnFormattedDate = true) {
   if (!listingDateText || listingDateText === "Not found") {
     return "Not found";
   }
@@ -30,15 +37,12 @@ export function calculateDOM(listingDateText) {
     const diffTime = today - listingDate;
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-    // Format the original date as MM/DD/YYYY
-    const formatDate = (date) => {
-      const month = (date.getMonth() + 1).toString().padStart(2, "0");
-      const day = date.getDate().toString().padStart(2, "0");
-      const year = date.getFullYear();
-      return `${month}/${day}/${year}`;
-    };
-
-    return `${diffDays} (${formatDate(listingDate)})`;
+    if(returnFormattedDate) {
+      return `${diffDays} (${formatDate(listingDate)})`;
+    }
+    else {
+      return diffDays;
+    }
   } catch (error) {
     return "Calculation error";
   }

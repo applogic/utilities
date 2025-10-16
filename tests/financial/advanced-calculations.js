@@ -12,8 +12,6 @@ import {
   calculatePriceFromDiscount,
   safePercentage,
   calculateCOCR30,
-  calculateDscrPayment,
-  calculateSfPayment,
   calculateCashFlow
 } from "../../src/financial/calculations.js";
 
@@ -420,31 +418,6 @@ describe("Advanced Financial Calculations", () => {
   });
 
   describe("Payment Calculations", () => {
-    test("calculateDscrPayment should calculate correctly", () => {
-      const askingPrice = 500000;
-      const dscrPercent = 70;
-      const dscrRate = 0.075;
-      const dscrAmortization = 30;
-      
-      const result = calculateDscrPayment(askingPrice, dscrPercent, dscrRate, dscrAmortization);
-      
-      // DSCR loan is 70% of 500k = 350k
-      const expectedPayment = calculatePMT(350000, 0.075, 30);
-      expect(result).toBeCloseTo(expectedPayment, 2);
-    });
-
-    test("calculateSfPayment should calculate correctly", () => {
-      const askingPrice = 500000;
-      const sellerFiPercent = 30;
-      const sellerFiRate = 0;
-      const sellerFiAmortization = 30;
-      
-      const result = calculateSfPayment(askingPrice, sellerFiPercent, sellerFiRate, sellerFiAmortization);
-      
-      // SF loan is 30% of 500k = 150k at 0%
-      const expectedPayment = calculatePMT(150000, 0, 30);
-      expect(result).toBeCloseTo(expectedPayment, 2);
-    });
 
     test("calculateCashFlow should subtract payments from NOI", () => {
       const monthlyNOI = 5000;

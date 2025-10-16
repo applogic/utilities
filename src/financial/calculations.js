@@ -321,18 +321,6 @@ export function calculateCashOutAfterRefi(originalPrice, dscrLoanAmount, sellerF
   }
 }
 
-// DSCR Payment calculation using existing calculatePMT
-export function calculateDscrPayment(askingPrice, dscrPercent, dscrRate, dscrAmortization) {
-  const dscrLoanAmount = askingPrice * (dscrPercent / 100);
-  return calculatePMT(dscrLoanAmount, dscrRate, dscrAmortization);
-}
-
-// SF Payment calculation using existing calculatePMT  
-export function calculateSfPayment(askingPrice, sellerFiPercent, sellerFiRate, sellerFiAmortization) {
-  const sellerFiAmount = askingPrice * (sellerFiPercent / 100);
-  return calculatePMT(sellerFiAmount, sellerFiRate, sellerFiAmortization);
-}
-
 // Cash Flow calculation (matching loopnet-analyzer exactly)
 export function calculateCashFlow(monthlyNOI, dscrPayment, sfPayment) {
   return monthlyNOI - (dscrPayment + sfPayment);

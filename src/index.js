@@ -14,13 +14,11 @@ export {
   calculateCOCR30, 
   calculateCOCRAtPercent,
   calculateDiscountFromPrice,
-  calculateDscrPayment,
   calculateNetToBuyer,
   calculateNOIByType,
   calculatePMT, 
   calculatePriceForCOCR,
   calculatePriceFromDiscount,
-  calculateSfPayment,
   safePercentage,
 } from "./financial/calculations.js";
 
@@ -31,7 +29,7 @@ export { formatCurrency, formatPriceValue, formatPercentage } from "./financial/
 export { extractPhoneNumber, extractBedrooms } from "./data/extractors.js";
 
 // Date utilities
-export { calculateDOM } from "./date/utilities.js";
+export { calculateDOM, formatDate } from "./date/utilities.js";
 
 // Formatting utilities
 export { 
