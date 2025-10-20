@@ -318,10 +318,10 @@ export async function lookupLOI(searchQuery) {
     };
   }
   
-  const spreadsheetResult = await lookupFromSpreadsheet(searchQuery);
-  if (spreadsheetResult.matchType !== MATCH_TYPES.NO_MATCH && spreadsheetResult.matchType !== MATCH_TYPES.NO_RESPONSE) {
-    return spreadsheetResult;
-  }
+  // const spreadsheetResult = await lookupFromSpreadsheet(searchQuery);
+  // if (spreadsheetResult.matchType !== MATCH_TYPES.NO_MATCH && spreadsheetResult.matchType !== MATCH_TYPES.NO_RESPONSE) {
+  //   return spreadsheetResult;
+  // }
   
   return await lookupFromAPI(searchQuery);
 }
