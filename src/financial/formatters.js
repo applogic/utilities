@@ -80,23 +80,26 @@ export function formatPriceValue(amount) {
 export function formatPercentage(percentage) {
   if (isNaN(percentage) || !isFinite(percentage)) return "N/A";
 
-  // Convert to string with enough decimals
   let str = percentage.toString();
 
   if (str.includes("e")) {
-    // Handle scientific notation
     str = Number(str).toFixed(2 + 10);
   }
 
-  // Split integer and decimal parts
   const [intPart, decPart = ""] = str.split(".");
 
-  // Take up to 2 decimals without rounding
+  if (!decPart) {
+    // No decimal part - just return the integer
+    return intPart + "%";
+  }
+
+  // Only remove trailing zeros from decimal part
   const truncatedDec = decPart.slice(0, 2);
-
-  // Combine and remove trailing zeros
-  const combined = truncatedDec ? `${intPart}.${truncatedDec}` : intPart;
-  const cleaned = combined.replace(/\.?0+$/, "");
-
-  return cleaned + "%";
+  const cleanedDec = truncatedDec.replace(/0+$/, "");
+  
+  if (cleanedDec) {
+    return intPart + "." + cleanedDec + "%";
+  } else {
+    return intPart + "%";
+  }
 }

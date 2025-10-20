@@ -175,6 +175,8 @@ async function lookupFromSpreadsheet(searchQuery) {
       },
       method: "GET",
     });
+
+    console.log('lookupFromSpreadsheet response', response)
     
     if (!response.ok) {
       return {
@@ -252,6 +254,8 @@ async function lookupFromAPI(searchQuery) {
       method: "GET",
     });
     
+    console.log('lookupFromAPI response', response)
+
     if (!response.ok) {
       return {
         data: null,
