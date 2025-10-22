@@ -2,7 +2,7 @@
  * DATE utilities
  */
 
-const formatDate = (dateString, includeYear = true) => {
+export function formatDate(dateString, includeYear = true) {
   if (!dateString) return "";
 
   // Detect if the string includes a timezone (Z or ±HH:MM)
@@ -23,7 +23,7 @@ const formatDate = (dateString, includeYear = true) => {
     : { month: "short", day: "numeric" };
 
   return date.toLocaleDateString("en-US", options);
-};
+}
 
 
 export function calculateDOM(listingDateText, returnFormattedDate = true) {
