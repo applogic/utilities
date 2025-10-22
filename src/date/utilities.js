@@ -9,6 +9,30 @@ export function formatDate(date) {
   return `${month}/${day}/${year}`;
 }
 
+const formatDate = (dateString, includeYear = true) => {
+  if (!dateString) return "";
+
+  // Detect if the string includes a timezone (Z or ±HH:MM)
+  const hasTimezone = /[zZ]|([+\-]\d{2}:?\d{2})/.test(dateString);
+
+  let date;
+  if (hasTimezone) {
+    date = new Date(dateString);
+  } else {
+    const [year, month, day] = dateString.split("T")[0].split("-").map(Number);
+    date = new Date(year, month - 1, day);
+  }
+
+  if (isNaN(date)) return "";
+
+  const options = includeYear
+    ? { month: "short", day: "numeric", year: "numeric" }
+    : { month: "short", day: "numeric" };
+
+  return date.toLocaleDateString("en-US", options);
+};
+
+
 export function calculateDOM(listingDateText, returnFormattedDate = true) {
   if (!listingDateText || listingDateText === "Not found") {
     return "Not found";
