@@ -254,9 +254,11 @@ async function lookupFromAPI(searchQuery) {
       method: "GET",
     });
     
+    console.log('lookupFromAPI URL', url)
     console.log('lookupFromAPI response', response)
 
     if (!response.ok) {
+      console.log("!response.ok", response)
       return {
         data: null,
         error: `HTTP ${response.status}`,
@@ -266,6 +268,7 @@ async function lookupFromAPI(searchQuery) {
     }
     
     const data = await response.json();
+    console.log('lookupFromAPI data', data)
     
     if (!data || !data.opportunityName) {
       return {
@@ -276,8 +279,10 @@ async function lookupFromAPI(searchQuery) {
     }
     
     const opportunityAddress = data.opportunityName.split("+")[0].trim();
+    console.log('lookupFromAPI opportunityAddress', opportunityAddress)
     
     const matchResult = matchAddresses(searchQuery, opportunityAddress);
+    console.log('lookupFromAPI matchResult', matchResult)
     
     return {
       data: {
@@ -295,6 +300,7 @@ async function lookupFromAPI(searchQuery) {
     };
     
   } catch (error) {
+    console.log('lookupFromAPI error', error)
     return {
       data: null,
       error: error.message,
