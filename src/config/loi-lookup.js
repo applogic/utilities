@@ -11,8 +11,8 @@ export const LOI_LOOKUP_CONFIG = {
   MATCH_TYPES: {
     EXACT: "exact",
     FUZZY: "fuzzy",
-    NO_MATCH: "no-match",
-    NO_RESPONSE: "no-response",
+    NO_MATCH: "service-replied-no-match",
+    NO_RESPONSE: "no-response-from-service",
   },
   
   LOI_SENT_STATUS: "LOI Sent",

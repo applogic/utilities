@@ -175,10 +175,9 @@ async function lookupFromSpreadsheet(searchQuery) {
       },
       method: "GET",
     });
-
-    console.log('lookupFromSpreadsheet response', response)
     
     if (!response.ok) {
+      console.log('lookupFromSpreadsheet response not ok', response)
       return {
         data: null,
         matchType: MATCH_TYPES.NO_RESPONSE,
@@ -254,11 +253,8 @@ async function lookupFromAPI(searchQuery) {
       method: "GET",
     });
     
-    console.log('lookupFromAPI URL', url)
-    console.log('lookupFromAPI response', response)
-
     if (!response.ok) {
-      console.log("!response.ok", response)
+      console.log("LOI lookupFromAPI !response.ok", response)
       return {
         data: null,
         error: `HTTP ${response.status}`,
@@ -268,21 +264,26 @@ async function lookupFromAPI(searchQuery) {
     }
     
     const data = await response.json();
-    console.log('lookupFromAPI data', data)
     
-    if (!data || !data.opportunityName) {
+    if (!data) {
+      console.log("LOI lookupFromAPI !data", response)
       return {
         data: null,
         matchType: MATCH_TYPES.NO_RESPONSE,
         searchQuery,
       };
     }
+
+    if (data.notFound) {
+      return {
+        data: null,
+        matchType: MATCH_TYPES.NO_MATCH,
+        searchQuery,
+      };
+    }
     
     const opportunityAddress = data.opportunityName.split("+")[0].trim();
-    console.log('lookupFromAPI opportunityAddress', opportunityAddress)
-    
     const matchResult = matchAddresses(searchQuery, opportunityAddress);
-    console.log('lookupFromAPI matchResult', matchResult)
     
     return {
       data: {
