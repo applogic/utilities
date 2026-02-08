@@ -94,12 +94,13 @@ describe("Core Financial Calculations", () => {
 
     test("should use financial constants for defaults", () => {
       const noi = 60000;
+      const defaultTier = FINANCIAL_CONSTANTS.INTEREST_RATE_TIERS[FINANCIAL_CONSTANTS.DEFAULT_INTEREST_RATE_TYPE];
       const result1 = calculatePriceForCOCR(noi, 0.15);
       const result2 = calculatePriceForCOCR(noi, 0.15, {
         downPercent: FINANCIAL_CONSTANTS.DEFAULT_DOWN_PAYMENT * 100,
-        dscrRate: FINANCIAL_CONSTANTS.DSCR_INTEREST_RATE
+        dscrRate: defaultTier.rate
       });
-      
+
       expect(result1).toBeCloseTo(result2, 0);
     });
 
@@ -117,8 +118,8 @@ describe("Core Financial Calculations", () => {
       const askingPrice = 500000;
       const noi = 60000;
       const result = calculateCOCRAtPercent(askingPrice, noi, 30);
-      
-      expect(result).toBeCloseTo(20.42, 2);
+
+      expect(result).toBeCloseTo(19.45, 2);
 
     });
     

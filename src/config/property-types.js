@@ -25,9 +25,12 @@ export const PROPERTY_TYPE_CONSTANTS = {
 
 // Property type enum for consistency
 export const PROPERTY_TYPES = {
-  MULTIFAMILY: 'multifamily',
-  STR: 'str',
   ASSISTED_LIVING: 'assisted',
+  BUSINESS: 'business',
+  MIXED_USE: 'mixed_use',
+  MULTIFAMILY: 'multifamily',
+  RV_PARK: 'rv_park',
+  STR: 'str',
 };
 
 // Convenience exports

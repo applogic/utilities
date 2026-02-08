@@ -4,6 +4,8 @@ import { FINANCIAL_CONSTANTS } from '../config/financial.js';
 import { BUSINESS_CONSTANTS } from '../config/business.js';
 import { PROPERTY_TYPE_CONSTANTS, PROPERTY_TYPES } from '../config/property-types.js';
 
+const DEFAULT_TIER = FINANCIAL_CONSTANTS.INTEREST_RATE_TIERS[FINANCIAL_CONSTANTS.DEFAULT_INTEREST_RATE_TYPE];
+
 
 /**
  * PMT function for loan payment calculation
@@ -56,8 +58,8 @@ export function calculatePriceForCOCR(noi, targetCOCR = 0.15, options = {}) {
   const {
     downPercent = FINANCIAL_CONSTANTS.DEFAULT_DOWN_PAYMENT * 100,
     dscrLtvPercent = FINANCIAL_CONSTANTS.DEFAULT_DSCR_PERCENTAGE * 100,
-    dscrRate = FINANCIAL_CONSTANTS.DSCR_INTEREST_RATE,
-    dscrTerm = FINANCIAL_CONSTANTS.DSCR_AMORTIZATION,
+    dscrRate = DEFAULT_TIER.rate,
+    dscrTerm = DEFAULT_TIER.amortization,
     maxIterations = BUSINESS_CONSTANTS.MAX_ITERATIONS,
     tolerance = BUSINESS_CONSTANTS.CALCULATION_TOLERANCE
   } = options;
@@ -116,8 +118,8 @@ export function calculatePriceForCOCR(noi, targetCOCR = 0.15, options = {}) {
  */
 export function calculateCOCRAtPercent(askingPrice, noi, downPercent, options = {}) {
   const {
-    dscrRate = FINANCIAL_CONSTANTS.DSCR_INTEREST_RATE,
-    dscrTerm = FINANCIAL_CONSTANTS.DSCR_AMORTIZATION,
+    dscrRate = DEFAULT_TIER.rate,
+    dscrTerm = DEFAULT_TIER.amortization,
   } = options;
 
   try {
@@ -290,8 +292,8 @@ export function calculateCashOutAfterRefi(originalPrice, dscrLoanAmount, sellerF
   const {
     appreciationRate = FINANCIAL_CONSTANTS.APPRECIATION_RATE,
     balloonYears = FINANCIAL_CONSTANTS.DEFAULT_BALLOON_PERIOD_YEARS,
-    dscrRate = FINANCIAL_CONSTANTS.DSCR_INTEREST_RATE,
-    dscrTerm = FINANCIAL_CONSTANTS.DSCR_AMORTIZATION,
+    dscrRate = DEFAULT_TIER.rate,
+    dscrTerm = DEFAULT_TIER.amortization,
     sellerFiTerm = FINANCIAL_CONSTANTS.SELLER_FI_AMORTIZATION,
     refiLtvPercent = 70 // 70% LTV on refi
   } = options;
