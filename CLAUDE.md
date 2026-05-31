@@ -1,52 +1,26 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance specific to the @archerjessop/utilities repository. Shared ecosystem rules are in the parent `../CLAUDE.md`.
 
 ## Project Overview
 
 @archerjessop/utilities is a shared NPM package containing business logic, financial calculations, constants, and utility functions used across all ArcherJessop property analysis tools.
 
-## Project Ecosystem
-
-This utilities repo is the FOUNDATION of a multi-repo system:
-
-**1. @archerjessop/utilities** (This repo - Shared NPM package)
-- Single source of truth for all business logic
-- Financial calculation functions
-- Formatting utilities and input handlers
-- Business and financial constants
-- Used by ALL other repos in the ecosystem
-
-**2. Browser Extensions** (e.g., loopnet-analyzer)
-- Chrome extensions that scrape property sites
-- Import utilities for calculations and formatting
-- Must work in browser environment
-
-**3. property-dashboard** (Server & dashboard)
-- Express.js backend, React frontend
-- Imports utilities for server and client-side use
-- Some files sync between CommonJS (server) and ESM (client)
-
 ### Critical Role
 
 **Changes here affect ALL consuming projects.** When modifying:
-- Financial calculations → impacts all property analysis
-- Constants → impacts business rules everywhere
-- Formatting → impacts all UI displays
+- Financial calculations -> impacts all property analysis
+- Constants -> impacts business rules everywhere
+- Formatting -> impacts all UI displays
 
-## Code Modification Guidelines
+## Backward Compatibility
 
 **Core Principle**: Backward compatibility is critical - breaking changes affect multiple projects.
 
-**Key Rules:**
 - Don't change function signatures without considering all consumers
 - Don't modify constant values without understanding business impact
 - Add new exports, don't remove existing ones without deprecation
 - Test in both browser and Node.js contexts
-
-**Before Making Changes:**
-- Understand which repos consume the function/constant
-- Consider if change requires updates in consuming projects
 - New functions are safer than modifying existing ones
 
 **Versioning:**
@@ -159,80 +133,6 @@ dist/
 - `extractPhoneNumber()` - DOM phone extraction (browser-only)
 - `extractBedrooms()` - DOM bedroom extraction (browser-only)
 
-## Business Logic
-
-### Financing Structure Formula
-
-**Down Payment + Seller Financing = 100%**
-
-Where:
-- **DSCR Loan** = Down Payment + 10%
-- **Seller Financing** = 100% - Down Payment
-
-### Property Type Calculations
-
-**Multifamily:**
-```javascript
-NOI = Price × Cap Rate
-```
-
-**STR (Short-Term Rental):**
-```javascript
-GrossRevenue = Price × ESTIMATED_GROSS_RATE (10%)
-NOI = GrossRevenue × NOI_PERCENTAGE (55%)
-```
-
-**Assisted Living:**
-```javascript
-NOI = Bedrooms × INCOME_PER_BEDROOM × 12
-```
-
-### Key Constants
-
-**Financial Constants:**
-- `DSCR_INTEREST_RATE`: 7.5%
-- `DSCR_AMORTIZATION`: 30 years
-- `DEFAULT_DOWN_PAYMENT`: 30%
-- `DEFAULT_CAP_RATE`: 5%
-- `APPRECIATION_RATE`: 4.5%
-
-**Business Constants:**
-- `ASSIGNMENT_FEE_PERCENTAGE`: 5%
-- `NET_TO_BUYER_PERCENTAGE`: 10%
-- `CLOSING_COSTS_PERCENTAGE`: 1.25%
-- `SELLER_AGENT_COMMISSION`: 2.5%
-- `BUYER_AGENT_COMMISSION`: 2.5%
-
-## Testing Strategy
-
-Tests mirror source structure in `tests/` directory:
-- `tests/config/` - Constants tests
-- `tests/financial/` - Calculation tests
-- `tests/formatting/` - Formatting tests
-- `tests/integration/` - Real-world scenario tests
-
-Run tests with `npm test`. Uses Vitest.
-
-**Testing Requirements:**
-- Test edge cases: zero, negative, very large values
-- Test both percentage and decimal inputs
-- Test environment compatibility (Node + browser)
-- Integration tests should use real-world property scenarios
-
-## Build Configuration
-
-**Rollup Configuration:**
-- Input: `src/index.js`
-- Output: `dist/index.js` (ESM)
-- Plugins: node-resolve, terser (minification)
-- Tree-shakeable output
-
-**Package Configuration:**
-- Type: `module` (ESM)
-- Main: `dist/index.js`
-- Exports CSS via path pattern
-- `sideEffects: false` for tree-shaking
-
 ## Environment Compatibility
 
 Functions must work in BOTH environments:
@@ -255,6 +155,36 @@ Functions must work in BOTH environments:
 ```javascript
 import { isNodeEnvironment, isBrowserEnvironment, getEnvVar } from '@archerjessop/utilities';
 ```
+
+## Testing Strategy
+
+Tests mirror source structure in `tests/` directory:
+- `tests/config/` - Constants tests
+- `tests/financial/` - Calculation tests
+- `tests/formatting/` - Formatting tests
+- `tests/integration/` - Real-world scenario tests
+
+Run tests with `npm test`. Uses Vitest.
+
+**Repo-specific testing requirements:**
+- Test edge cases: zero, negative, very large values
+- Test both percentage and decimal inputs
+- Test environment compatibility (Node + browser)
+- Integration tests should use real-world property scenarios
+
+## Build Configuration
+
+**Rollup Configuration:**
+- Input: `src/index.js`
+- Output: `dist/index.js` (ESM)
+- Plugins: node-resolve, terser (minification)
+- Tree-shakeable output
+
+**Package Configuration:**
+- Type: `module` (ESM)
+- Main: `dist/index.js`
+- Exports CSS via path pattern
+- `sideEffects: false` for tree-shaking
 
 ## Common Tasks
 
@@ -283,12 +213,7 @@ import { isNodeEnvironment, isBrowserEnvironment, getEnvVar } from '@archerjesso
 3. Add constants for the new type
 4. Update tests
 
-## Code Style Preferences
-
-**Formatting:**
-- Use double quotes (") for strings
-- Alphabetize exports in index.js
-- Alphabetize object keys in constants
+## Repo-Specific Code Style
 
 **Function Patterns:**
 - Optional parameters as object: `function(required, options = {})`
@@ -304,19 +229,6 @@ import { isNodeEnvironment, isBrowserEnvironment, getEnvVar } from '@archerjesso
 export const FINANCIAL_CONSTANTS = { ... };
 export const { DSCR_INTEREST_RATE, DEFAULT_DOWN_PAYMENT } = FINANCIAL_CONSTANTS;
 ```
-
-**Comments:**
-- Do not add comments to code (except JSDoc for complex functions)
-- Do not remove existing comments
-- Do not change existing comments
-
-## Git Commit Guidelines
-
-**CRITICAL: Commit Message Format**
-- NEVER include Claude Code attribution in commit messages
-- NEVER add "Co-Authored-By: Claude" or any AI attribution
-- Commit messages should be clean, professional, and contain ONLY the change description
-- Format: Single line description followed by blank line and optional detailed explanation if needed
 
 ## Publishing Checklist
 

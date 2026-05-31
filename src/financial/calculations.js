@@ -141,6 +141,41 @@ export function calculateCOCRAtPercent(askingPrice, noi, downPercent, options = 
 }
 
 /**
+ * Calculate STR (short-term rental) NOI - the single source of STR NOI math.
+ *
+ * Resolution order:
+ *   1. apiResult type 'noi'   -> value is already net, return as-is
+ *   2. apiResult type 'gross' -> apply NOI margin (value * noiPercentage)
+ *   3. no/invalid apiResult   -> estimate from price (price * grossRate * noiPercentage)
+ *
+ * apiResult comes from api.archerjessop.com/str-revenue: { value, type }.
+ * Pass null while that backend is not live (the price estimate is used).
+ *
+ * @param {number} askingPrice - Property asking price
+ * @param {{value:number, type:'noi'|'gross'}|null} apiResult - STR revenue API result
+ * @param {Object} options - Rate overrides (default to STR config constants)
+ * @returns {number} Annual NOI (0 on invalid input)
+ */
+export function calculateSTRNOI(askingPrice, apiResult = null, options = {}) {
+  const {
+    grossRate = PROPERTY_TYPE_CONSTANTS.STR.ESTIMATED_GROSS_RATE,
+    noiPercentage = PROPERTY_TYPE_CONSTANTS.STR.NOI_PERCENTAGE
+  } = options;
+
+  try {
+    if (apiResult && Number.isFinite(apiResult.value) && apiResult.value >= 0) {
+      if (apiResult.type === "noi") return apiResult.value;
+      if (apiResult.type === "gross") return apiResult.value * noiPercentage;
+    }
+
+    if (!Number.isFinite(askingPrice) || askingPrice <= 0) return 0;
+    return askingPrice * grossRate * noiPercentage;
+  } catch (error) {
+    return 0;
+  }
+}
+
+/**
  * Calculate NOI based on property type
  * @param {number} askingPrice - Property asking price
  * @param {number} capRate - Cap rate as decimal (e.g., 0.08 for 8%)
@@ -150,6 +185,7 @@ export function calculateCOCRAtPercent(askingPrice, noi, downPercent, options = 
  */
 export function calculateNOIByType(askingPrice, capRate, propertyType = PROPERTY_TYPES.MULTIFAMILY, options = {}) {
   const {
+    strApiResult = null,
     strGrossIncomeMultiplier = PROPERTY_TYPE_CONSTANTS.STR.ESTIMATED_GROSS_RATE,
     strNoiPercentage = PROPERTY_TYPE_CONSTANTS.STR.NOI_PERCENTAGE,
     assistedIncomePerBedroom = PROPERTY_TYPE_CONSTANTS.ASSISTED_LIVING.INCOME_PER_BEDROOM_MONTHLY,
@@ -159,9 +195,11 @@ export function calculateNOIByType(askingPrice, capRate, propertyType = PROPERTY
   try {
     switch (propertyType.toLowerCase()) {
       case PROPERTY_TYPES.STR:
-        const estimatedGrossIncome = askingPrice * strGrossIncomeMultiplier;
-        return estimatedGrossIncome * strNoiPercentage;
-        
+        return calculateSTRNOI(askingPrice, strApiResult, {
+          grossRate: strGrossIncomeMultiplier,
+          noiPercentage: strNoiPercentage
+        });
+
       case PROPERTY_TYPES.ASSISTED_LIVING:
         return bedroomCount * assistedIncomePerBedroom * 12;
         

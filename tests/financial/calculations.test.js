@@ -7,6 +7,7 @@ import {
   calculatePriceForCOCR,
   calculateCOCRAtPercent,
   calculateNOIByType,
+  calculateSTRNOI,
   calculateAssignmentFee,
   calculateNetToBuyer
 } from "../../src/financial/calculations.js";
@@ -155,8 +156,83 @@ describe("Core Financial Calculations", () => {
 
     test("should handle custom bedroom count for assisted living", () => {
       const result = calculateNOIByType(500000, 0.08, PROPERTY_TYPES.ASSISTED_LIVING, { bedroomCount: 6 });
-      
+
       expect(result).toBe(6 * PROPERTY_TYPE_CONSTANTS.ASSISTED_LIVING.INCOME_PER_BEDROOM_MONTHLY * 12);
+    });
+
+    test("REGRESSION: STR branch delegates to calculateSTRNOI but preserves the 5.5% estimate", () => {
+      const askingPrice = 500000;
+      const viaType = calculateNOIByType(askingPrice, 0.08, PROPERTY_TYPES.STR);
+      const viaDirect = calculateSTRNOI(askingPrice);
+      const expectedNOI = askingPrice
+        * PROPERTY_TYPE_CONSTANTS.STR.ESTIMATED_GROSS_RATE
+        * PROPERTY_TYPE_CONSTANTS.STR.NOI_PERCENTAGE;
+
+      expect(viaType).toBe(expectedNOI);
+      expect(viaType).toBe(viaDirect);
+    });
+
+    test("STR branch passes strApiResult through to calculateSTRNOI", () => {
+      const result = calculateNOIByType(500000, 0.08, PROPERTY_TYPES.STR, {
+        strApiResult: { value: 90000, type: "noi" }
+      });
+
+      expect(result).toBe(90000);
+    });
+  });
+
+  describe("calculateSTRNOI", () => {
+    test("estimates 5.5% of price when no apiResult is supplied", () => {
+      const askingPrice = 500000;
+      const expected = askingPrice
+        * PROPERTY_TYPE_CONSTANTS.STR.ESTIMATED_GROSS_RATE
+        * PROPERTY_TYPE_CONSTANTS.STR.NOI_PERCENTAGE;
+
+      expect(calculateSTRNOI(askingPrice)).toBe(expected);
+      expect(calculateSTRNOI(askingPrice, null)).toBe(expected);
+    });
+
+    test("returns the API value as-is when type is 'noi'", () => {
+      expect(calculateSTRNOI(500000, { value: 72000, type: "noi" })).toBe(72000);
+    });
+
+    test("applies the NOI margin when type is 'gross'", () => {
+      const result = calculateSTRNOI(500000, { value: 120000, type: "gross" });
+      expect(result).toBe(120000 * PROPERTY_TYPE_CONSTANTS.STR.NOI_PERCENTAGE);
+    });
+
+    test("falls back to the price estimate when apiResult.value is not a finite number", () => {
+      const expected = 500000
+        * PROPERTY_TYPE_CONSTANTS.STR.ESTIMATED_GROSS_RATE
+        * PROPERTY_TYPE_CONSTANTS.STR.NOI_PERCENTAGE;
+
+      expect(calculateSTRNOI(500000, { value: NaN, type: "noi" })).toBe(expected);
+      expect(calculateSTRNOI(500000, { value: undefined, type: "gross" })).toBe(expected);
+      expect(calculateSTRNOI(500000, { value: -5, type: "noi" })).toBe(expected);
+    });
+
+    test("falls back to the price estimate when apiResult.type is unrecognized", () => {
+      const expected = 500000
+        * PROPERTY_TYPE_CONSTANTS.STR.ESTIMATED_GROSS_RATE
+        * PROPERTY_TYPE_CONSTANTS.STR.NOI_PERCENTAGE;
+
+      expect(calculateSTRNOI(500000, { value: 80000, type: "revenue" })).toBe(expected);
+    });
+
+    test("returns 0 for invalid price when no API value is available", () => {
+      expect(calculateSTRNOI(0)).toBe(0);
+      expect(calculateSTRNOI(-100000)).toBe(0);
+      expect(calculateSTRNOI(NaN)).toBe(0);
+      expect(calculateSTRNOI(undefined)).toBe(0);
+    });
+
+    test("still returns the API value for a zero/invalid price when type is 'noi'", () => {
+      expect(calculateSTRNOI(0, { value: 60000, type: "noi" })).toBe(60000);
+    });
+
+    test("honors rate overrides passed via options", () => {
+      const result = calculateSTRNOI(500000, null, { grossRate: 0.12, noiPercentage: 0.5 });
+      expect(result).toBe(500000 * 0.12 * 0.5);
     });
   });
 

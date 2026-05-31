@@ -26,9 +26,9 @@
     "prepublishOnly": "npm run clean && npm run build && npm run test",
     "lint": "eslint src tests",
     "lint:fix": "eslint src tests --fix",
-    "release:patch": "npm version patch && git push && git push --tags && npm publish --access public",
-    "release:minor": "npm version minor && git push && git push --tags && npm publish --access public",
-    "release:major": "npm version major && git push && git push --tags && npm publish --access public"
+    "release:patch": "npm test && npm version patch && npm publish --access public && git push && git push --tags",
+    "release:minor": "npm test && npm version minor && npm publish --access public && git push && git push --tags",
+    "release:major": "npm test && npm version major && npm publish --access public && git push && git push --tags"
   },
   "repository": {
     "type": "git",

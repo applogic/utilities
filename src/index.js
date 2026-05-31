@@ -16,9 +16,10 @@ export {
   calculateDiscountFromPrice,
   calculateNetToBuyer,
   calculateNOIByType,
-  calculatePMT, 
+  calculatePMT,
   calculatePriceForCOCR,
   calculatePriceFromDiscount,
+  calculateSTRNOI,
   safePercentage,
 } from "./financial/calculations.js";
 
