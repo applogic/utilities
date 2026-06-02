@@ -1,4 +1,4 @@
-export default {
+module.exports = {
   env: {
     es2022: true,
     node: true,
@@ -23,5 +23,11 @@ export default {
     'comma-dangle': ['error', 'only-multiline'],
     'quotes': ['error', 'double', { 'allowTemplateLiterals': true }],
     'semi': ['error', 'always']
-  }
+  },
+  overrides: [
+    {
+      files: ['src/browser/**', 'tests/browser/**'],
+      env: { browser: true }
+    }
+  ]
 };

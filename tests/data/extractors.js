@@ -1,7 +1,7 @@
 // tests/data/extractors.test.js
 import { describe, test, expect, beforeEach } from "vitest";
 import { JSDOM } from "jsdom";
-import { extractPhoneNumber, extractBedrooms } from "../../src/data/extractors.js";
+import { extractPhoneNumber, extractBedrooms } from "../../src/browser/data/extractors.js";
 
 describe("Data Extractors", () => {
   let dom;

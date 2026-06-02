@@ -6,13 +6,16 @@
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
+    "./browser": "./dist/browser/index.js",
     "./dist/styles/*.css": "./dist/styles/*.css"
   },
   "files": [
     "dist",
     "README.md"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/browser/**"
+  ],
   "engines": {
     "node": ">=16"
   },
@@ -36,6 +39,9 @@
   },
   "author": "ArcherJessop",
   "license": "MIT",
+  "dependencies": {
+    "@floating-ui/dom": "^1.7.4"
+  },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-terser": "^0.4.4",

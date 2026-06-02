@@ -2,7 +2,7 @@ import { nodeResolve } from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 
 export default {
-  input: 'src/index.js',
+  input: ['src/index.js', 'src/browser/index.js'],
   output: {
     dir: 'dist',
     format: 'es',
@@ -22,7 +22,8 @@ export default {
     })
   ],
   external: [
-    // Add external dependencies here that shouldn't be bundled
-    // Example: 'lodash'
+    // @floating-ui/dom is a runtime dependency of the /browser entry; the consuming
+    // extension bundles its own copy, so keep it external instead of inlining it here.
+    '@floating-ui/dom'
   ]
 };

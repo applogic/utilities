@@ -26,8 +26,13 @@ export {
 // Financial formatters
 export { formatCurrency, formatPriceValue, formatPercentage } from "./financial/formatters.js";
 
-// Data extractors
-export { extractPhoneNumber, extractBedrooms } from "./data/extractors.js";
+// Export logic (pure export-object creation)
+export {
+  calculateOriginalPrice,
+  convertCapRateToDecimal,
+  createExportObjectCore,
+  formatDownPaymentPercent,
+} from "./export/export-logic.js";
 
 // Date utilities
 export { calculateDOM, formatDate } from "./date/utilities.js";
@@ -47,11 +52,11 @@ export {
 export { normalizeWhitespace } from "./formatting/text.js";
 
 // Configuration constants
-export * from './config/financial.js';
-export * from './config/property-types.js';
-export * from './config/business.js';
+export * from "./config/financial.js";
+export * from "./config/property-types.js";
+export * from "./config/business.js";
 
-export const STYLES_PATH = './dist/styles/base.css';
+export const STYLES_PATH = "./dist/styles/base.css";
 
 // LOI Lookup service and config
 export { lookupLOI } from "./services/loi-lookup.js";
