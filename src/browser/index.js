@@ -60,3 +60,12 @@ export {
 // Widget builders
 export { createNavigationGuard } from "./widget/createNavigationGuard.js";
 export { createPanel } from "./widget/createPanel.js";
+
+// Analyzer engine — a site becomes a thin adapter; the engine owns everything else.
+export { createAnalyzer } from "./widget/createAnalyzer.js";
+export { createAnalyzerState } from "./widget/createAnalyzerState.js";
+export { calculateFinancials } from "./financial/calculateFinancials.js";
+
+// Agnostic services (pure IO; the engine orchestrates caching / loading / stale-drop)
+export { fetchEquity } from "./services/equity.js";
+export { fetchStrRevenue } from "./services/str-revenue.js";
