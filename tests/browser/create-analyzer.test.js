@@ -223,4 +223,14 @@ describe("createAnalyzer — cap display: active rate + reported-on-hover (T8)",
     expect(analyzer.ctx.state.capManuallySet).toBe(true);
     expect(document.getElementById("prop-cap").textContent).toBe("6.0%");
   });
+
+  test("export carries the computed NOI (baseNOI) while capRate stays the reported value (T2)", async () => {
+    // WHY T2: the export ships the computed NOI as an additive field; the reported cap rate is
+    // unchanged. MF $1,299,000 @ 6.5% -> NOI 84,435; capRate 0.065 (scraped/reported).
+    const analyzer = await render(makeAdapter({ listing: makeListing({ capRate: "6.5%" }) }));
+    const exp = await analyzer.createExportObject();
+    expect(exp.noi).toBe(84435);
+    expect(exp.capRate).toBe(0.065);
+    expect(exp.capRateSource).toBe("scraped");
+  });
 });

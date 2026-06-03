@@ -26,6 +26,7 @@ export function createExportObjectCore(data, options = {}) {
     currentPropertyType = "str",
     equitySource = "scraped",
     isUsingEstimatedCapRate = false,
+    noi = null,
     numberOfUnits = 4,
     priceWasDefaulted = false,
     windowLocation = "",
@@ -85,6 +86,13 @@ export function createExportObjectCore(data, options = {}) {
         exportData.price = displayedPrice;
       }
     }
+  }
+
+  // 6b. NOI - the computed net operating income (additive; the dashboard stores it in the noi
+  // column and derives the active cap rate as noi/price). The reported cap rate is carried
+  // separately in capRate, unchanged. Omitted when no NOI was computed.
+  if (Number.isFinite(noi) && noi > 0) {
+    exportData.noi = Math.round(noi);
   }
 
   // 7. Down Payment Percent (user-controlled value)

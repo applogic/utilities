@@ -44,6 +44,21 @@ describe("createExportObjectCore", () => {
     expect(result.priceDiscountPercent).toBe(0.15);
   });
 
+  test("carries the computed NOI as an additive field (rounded); capRate stays the reported value", () => {
+    // WHY T2: the dashboard stores the computed NOI and derives the active cap from it, while
+    // capRate keeps the REPORTED rate (7% -> 0.07). NOI is exported as a rounded integer.
+    const result = createExportObjectCore(baseListing, { noi: 84435.6 });
+    expect(result.noi).toBe(84436);
+    expect(result.capRate).toBe(0.07);
+  });
+
+  test("omits noi when none was computed (additive/nullable, never 0)", () => {
+    // WHY: a missing or non-positive NOI must not ship as 0/garbage into the dashboard column.
+    expect(createExportObjectCore(baseListing, {}).noi).toBeUndefined();
+    expect(createExportObjectCore(baseListing, { noi: 0 }).noi).toBeUndefined();
+    expect(createExportObjectCore(baseListing, { noi: null }).noi).toBeUndefined();
+  });
+
   test("emits keys in alphabetized order", () => {
     // WHY: the export contract specifies alphabetized keys; ordering is part of the
     // stable URL shape consumers depend on.

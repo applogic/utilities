@@ -509,6 +509,7 @@ export function createAnalyzer(adapter) {
       currentPropertyType: state.currentPropertyType,
       equitySource: state.equitySource,
       isUsingEstimatedCapRate: state.isUsingEstimatedCapRate,
+      noi: state.baseNOI,
       numberOfUnits: state.numberOfUnits,
       priceWasDefaulted: state.priceWasDefaulted,
       windowLocation: window.location.href,
