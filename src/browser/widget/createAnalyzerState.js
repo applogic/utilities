@@ -35,6 +35,7 @@ export function createAnalyzerState({ defaultPropertyType = PROPERTY_TYPES.MULTI
     originalCapRate: null,
     originalMultifamilyCapRate: null,
     capRateAlreadyDetermined: false,
+    capManuallySet: false,
 
     // Cache state
     baseNOI: null,
@@ -68,6 +69,7 @@ export function createAnalyzerState({ defaultPropertyType = PROPERTY_TYPES.MULTI
       cachedLoiData: {},
       cachedSTRData: null,
       cachedStrValue: null,
+      capManuallySet: false,
       capRateAlreadyDetermined: false,
       currentEstimatedCapRate: FINANCIAL_CONSTANTS.DEFAULT_CAP_RATE * 100,
       currentPriceDiscount: 0,

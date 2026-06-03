@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAnalyzer } from "../../src/browser/widget/createAnalyzer.js";
+import { removeAllTooltips } from "../../src/browser/ui/tooltip-manager.js";
 
 // The LOI lookup is the one live network call in the pipeline; stub it so the render test is
 // deterministic (the engine maps its matchType to a lead-status string — any resolved value
@@ -138,5 +139,88 @@ describe("createAnalyzer — full pipeline render (jsdom)", () => {
     expect(noi.startsWith("$")).toBe(true);
     expect(document.getElementById("prop-cap").textContent).toBe("6.5%");
     expect(document.getElementById("prop-equity").textContent).toBe("55%");
+  });
+});
+
+describe("createAnalyzer — cap display: active rate + reported-on-hover (T8)", () => {
+  // The cap tooltip content is rendered into a .floating-tooltip div (innerHTML). Find the one
+  // for the cap metric by its "Reported cap rate" heading.
+  function capTooltipText() {
+    const tip = [...document.querySelectorAll(".floating-tooltip")].find((t) =>
+      t.textContent.includes("Reported cap rate")
+    );
+    return tip ? tip.textContent : "";
+  }
+
+  async function render(adapter) {
+    const analyzer = createAnalyzer(adapter);
+    analyzer.runPipeline();
+    await vi.runAllTimersAsync();
+    return analyzer;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    removeAllTooltips();
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ equity: 60 }) }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    removeAllTooltips();
+    document.getElementById("ln-footer")?.remove();
+  });
+
+  test("multifamily with a real cap: active cap = reported cap, shown on hover", async () => {
+    // WHY: for MF the cap IS the NOI input, so active (NOI/price) equals the reported cap — but
+    // the reported value must still surface on hover (not "N/A").
+    await render(makeAdapter({ listing: makeListing({ capRate: "6.5%" }) }));
+    expect(document.getElementById("prop-cap").textContent).toBe("6.5%");
+    expect(capTooltipText()).toContain("6.5%");
+    expect(capTooltipText()).not.toContain("N/A");
+  });
+
+  test("STR with a published cap: panel shows active cap (5.5% estimate), reported cap on hover", async () => {
+    // WHY this is the T8 fix: STR NOI is the 5.5% estimate, NOT price x reported cap. So the
+    // active cap (NOI/price = 5.5%) differs from the reported cap (4.86%). The panel shows the
+    // active rate; the reported rate is provenance on hover. (820 Island Dr: STR NOI 71,445.)
+    await render(
+      makeAdapter({
+        config: { cssFiles: [], defaultPropertyType: "str" },
+        listing: makeListing({ capRate: "4.86%" }),
+      })
+    );
+    expect(document.getElementById("prop-cap").textContent).toBe("5.5%");
+    expect(capTooltipText()).toContain("4.86%");
+  });
+
+  test("no reported cap anywhere: hover shows N/A (plus the click-to-cycle hint)", async () => {
+    // WHY: a "Not found" cap means there is no reported value — the hover must say N/A rather
+    // than echo the engine's 5% estimate as if the listing reported it.
+    await render(makeAdapter({ listing: makeListing({ capRate: "Not found" }) }));
+    expect(document.getElementById("prop-cap").textContent).toBe("5.0%");
+    expect(capTooltipText()).toContain("N/A");
+    expect(capTooltipText()).toContain("Click the cap rate");
+  });
+
+  test("clicking an estimated cap overrides NOI so the active cap rises 1% (STR)", async () => {
+    // WHY: clicking the cap is a manual NOI override for EVERY type. STR NOI normally ignores the
+    // cap (5.5% estimate -> active 5.5%); without the override the click would do nothing. With
+    // it, NOI = price x cap (5% -> 6%): 1,299,000 x 0.06 = 77,940 -> active 6.0%. This is the
+    // behavior the user asked for.
+    const analyzer = await render(
+      makeAdapter({
+        config: { cssFiles: [], defaultPropertyType: "str" },
+        listing: makeListing({ capRate: "Not found" }),
+      })
+    );
+    expect(document.getElementById("prop-cap").textContent).toBe("5.5%");
+
+    document.getElementById("prop-cap").click();
+    await vi.runAllTimersAsync();
+
+    expect(analyzer.ctx.state.capManuallySet).toBe(true);
+    expect(document.getElementById("prop-cap").textContent).toBe("6.0%");
   });
 });

@@ -129,6 +129,49 @@ export function createAnalyzer(adapter) {
     }
   }
 
+  // The panel shows the ACTIVE cap rate = NOI / current price (discount-aware via
+  // getCurrentPrice), so the displayed cap is always internally consistent with the NOI metric
+  // — including STR/assisted, where NOI is the type estimate/bedroom value and the listed cap
+  // never drove it. The REPORTED cap (the scraped value, only when it was a real non-estimated
+  // cap) is shown on hover; "N/A" when none was reported. When the cap is an estimate the
+  // tooltip also keeps the click-to-cycle hint (clicking the cap is a manual NOI override).
+  function updateActiveCapDisplay() {
+    const capElement = document.getElementById("prop-cap");
+    if (!capElement) return;
+
+    const priceText = getCurrentPrice() || document.getElementById("prop-price")?.textContent || "";
+    const priceMatch = priceText.match(/[\d,]+/);
+    const price = priceMatch ? parseFloat(priceMatch[0].replace(/,/g, "")) : null;
+
+    if (Number.isFinite(state.baseNOI) && Number.isFinite(price) && price > 0) {
+      capElement.textContent = `${((state.baseNOI / price) * 100).toFixed(1)}%`;
+    } else {
+      capElement.textContent = "N/A";
+    }
+
+    let reported = null;
+    if (!state.isUsingEstimatedCapRate && state.originalCapRate) {
+      const m = state.originalCapRate.match(/[\d.]+/);
+      if (m) reported = parseFloat(m[0]);
+    }
+    const reportedLine = `<strong>Reported cap rate:</strong> ${reported != null ? `${reported}%` : "N/A"}`;
+    const cycleHint = state.isUsingEstimatedCapRate
+      ? "<hr><em>Click the cap rate to increase by 1%; click the label to reset</em>"
+      : "";
+    const tooltipContent = `${reportedLine}${cycleHint}`;
+
+    const metric = capElement.closest(".metric");
+    if (metric) {
+      const label = metric.querySelector(".metric-label");
+      if (!hasTooltip(metric)) {
+        attachTooltip(metric, tooltipContent);
+        if (label) label.classList.add("has-tooltip");
+      } else {
+        updateTooltipContent(metric, tooltipContent);
+      }
+    }
+  }
+
   function syncUnitsFieldForType(propertyType, bedroomCount) {
     const label = document.querySelector(".units-inline-label");
     if (label) label.textContent = propertyType === "assisted" ? "beds" : "units";
@@ -303,23 +346,24 @@ export function createAnalyzer(adapter) {
 
     if (state.currentPropertyType === "str") updateState({ cachedSTRData: null });
 
-    const financials = await calculateFinancials(ctx, priceText, capRateText, state.currentPropertyType, address);
-    applyFinancials(financials);
-
-    if (financials && state.currentPriceDiscount > 0 && state.baseNOI && state.originalPrice) {
-      const capElement = document.getElementById("prop-cap");
-      if (capElement) {
-        const currentPrice = getCurrentPrice();
-        const currentPriceMatch = currentPrice.match(/[\d,]+/);
-        if (currentPriceMatch) {
-          const priceValue = parseFloat(currentPriceMatch[0].replace(/,/g, ""));
-          const effectiveCapRate = (state.baseNOI / priceValue) * 100;
-          const formattedCapRate = `${effectiveCapRate.toFixed(1)}%`;
-          capElement.textContent = formattedCapRate;
-          capElement.title = `Effective cap rate at discounted price: ${formattedCapRate}`;
+    // Manual cap override: clicking the cap rate sets NOI = original price x cap for EVERY type
+    // (analyst intent), so the active cap moves with the click even for STR/assisted whose NOI
+    // is otherwise the type estimate / bedroom value. Pre-seed baseNOI so calculateFinancials
+    // uses it instead of recomputing from the type model.
+    if (state.capManuallySet) {
+      const opText = state.originalPrice || priceText;
+      const opMatch = opText.match(/[\d,]+/);
+      if (opMatch) {
+        const op = parseFloat(opMatch[0].replace(/,/g, ""));
+        if (Number.isFinite(op) && op > 0) {
+          updateState({ baseNOI: op * (state.currentEstimatedCapRate / 100) });
         }
       }
     }
+
+    const financials = await calculateFinancials(ctx, priceText, capRateText, state.currentPropertyType, address);
+    applyFinancials(financials);
+    updateActiveCapDisplay();
   }
 
   // ---- agnostic service orchestration (engine-owned) --------------------------------
@@ -596,7 +640,6 @@ export function createAnalyzer(adapter) {
     updateElement("prop-name", data.name);
     // Display guard (H2): a defaulted price shows "No price"; the metrics fall through to N/A.
     updateElement("prop-price", state.priceWasDefaulted ? "No price" : data.price);
-    updateElement("prop-cap", data.capRate);
     updateElement("prop-contact", data.contact);
     updateElement("prop-phone", data.phone);
     updateElement("prop-dom", calculateDOM(data.listingDate));
@@ -610,6 +653,7 @@ export function createAnalyzer(adapter) {
     const financials = await calculateFinancials(ctx, data.price, calculationCapRate, state.currentPropertyType, data.name);
     if (guard.isStale()) return;
     applyFinancials(financials);
+    updateActiveCapDisplay();
 
     const loiData = await loadLeadStatus(data.name);
     if (guard.isStale()) return;

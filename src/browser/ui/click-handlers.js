@@ -121,7 +121,7 @@ export function setupCapRateClickHandler(capElement, capLabelElement, callbacks)
       newCapRate = 5;
     }
 
-    updateState({ currentEstimatedCapRate: newCapRate });
+    updateState({ currentEstimatedCapRate: newCapRate, capManuallySet: true });
 
     capElement.textContent = `${newCapRate}%*`;
     callbacks.recalculateFinancials();
@@ -139,7 +139,7 @@ export function setupCapRateClickHandler(capElement, capLabelElement, callbacks)
     e.stopPropagation();
 
     const originalCapRate = state.originalEstimatedCapRate || FINANCIAL_CONSTANTS.DEFAULT_CAP_RATE;
-    updateState({ currentEstimatedCapRate: originalCapRate });
+    updateState({ currentEstimatedCapRate: originalCapRate, capManuallySet: false, baseNOI: null });
 
     capElement.textContent = `${originalCapRate}%*`;
     callbacks.recalculateFinancials();
