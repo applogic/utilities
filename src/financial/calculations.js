@@ -213,6 +213,72 @@ export function calculateNOIByType(askingPrice, capRate, propertyType = PROPERTY
 }
 
 /**
+ * Resolve a listing's canonical NOI and the cap rates derived from it.
+ *
+ * NOI is the source of truth; each property type computes it by its own model
+ * (delegated to calculateNOIByType, unchanged). The active (displayed) cap rate is
+ * always derived as NOI / price. The reported cap rate is carried through as
+ * provenance (shown on hover; null => the UI shows "N/A"); it only DRIVES the NOI for
+ * multifamily, where the cap rate is the model input.
+ *
+ * NOI precedence: an analyst-confirmed NOI overrides the per-type model; otherwise STR
+ * uses measured 3rd-party revenue when present and the price-based estimate otherwise;
+ * assisted uses bedroom count; multifamily uses the reported cap (or estimatedCapRate
+ * when none was reported).
+ *
+ * @param {Object} input
+ * @param {number|null} [input.bedroomCount] - Bedroom count for assisted living
+ * @param {number|null} [input.confirmedNOI] - Analyst-confirmed/edited NOI; overrides the per-type model
+ * @param {number} [input.estimatedCapRate] - Fallback cap (decimal) used for multifamily NOI when none was reported
+ * @param {number} input.price - Asking price
+ * @param {string} [input.propertyType] - One of PROPERTY_TYPES
+ * @param {number|null} [input.reportedCapRate] - Real scraped/listed cap rate as a decimal (e.g. 0.0486); null when none was reported
+ * @param {{value:number,type:'noi'|'gross'}|null} [input.strApiResult] - Measured STR revenue (3rd-party); null until that backend ships
+ * @returns {{activeCapRate:(number|null), noi:number, noiSource:string, reportedCapRate:(number|null)}}
+ */
+export function resolveListingFinancials({
+  bedroomCount = null,
+  confirmedNOI = null,
+  estimatedCapRate,
+  price,
+  propertyType = PROPERTY_TYPES.MULTIFAMILY,
+  reportedCapRate = null,
+  strApiResult = null,
+} = {}) {
+  const hasReported = reportedCapRate != null && Number.isFinite(reportedCapRate);
+  const capForNOI = hasReported ? reportedCapRate : estimatedCapRate;
+  const measured = strApiResult && Number.isFinite(strApiResult.value) && strApiResult.value >= 0 &&
+    (strApiResult.type === "noi" || strApiResult.type === "gross");
+
+  let noi;
+  let noiSource;
+  if (confirmedNOI != null && Number.isFinite(confirmedNOI) && confirmedNOI >= 0) {
+    noi = confirmedNOI;
+    noiSource = "confirmed";
+  } else {
+    noi = calculateNOIByType(price, capForNOI, propertyType, { bedroomCount, strApiResult });
+    const type = (propertyType || "").toLowerCase();
+    if (type === PROPERTY_TYPES.STR) {
+      noiSource = measured ? "measured" : "estimate";
+    } else if (type === PROPERTY_TYPES.ASSISTED_LIVING) {
+      noiSource = "bedrooms";
+    } else {
+      noiSource = hasReported ? "cap" : "estimate";
+    }
+  }
+
+  if (!Number.isFinite(noi)) noi = 0;
+  const activeCapRate = Number.isFinite(price) && price > 0 ? noi / price : null;
+
+  return {
+    activeCapRate,
+    noi,
+    noiSource,
+    reportedCapRate: hasReported ? reportedCapRate : null,
+  };
+}
+
+/**
  * Calculate assignment fee
  * @param {number} askingPrice - Property asking price
  * @param {number} assignmentPercent - Assignment fee percentage (uses config default)
