@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createExportObjectCore } from "../../src/export/export-logic.js";
+import { createExportObjectCore, mapPropertyType } from "../../src/export/export-logic.js";
 
 const baseListing = {
   capRate: "7%",
@@ -49,5 +49,27 @@ describe("createExportObjectCore", () => {
     // stable URL shape consumers depend on.
     const keys = Object.keys(createExportObjectCore(baseListing, {}));
     expect(keys).toEqual([...keys].sort());
+  });
+});
+
+describe("mapPropertyType", () => {
+  // WHY this is exported: property-dashboard kept a byte-identical third copy of this table
+  // (validation/property.js). Exporting it lets the dashboard import the single source of truth,
+  // so the on-screen-type -> DB-enum mapping can never silently drift between the two.
+  test("maps multifamily to the DB enum mfr and passes the rest through", () => {
+    expect(mapPropertyType("multifamily")).toBe("mfr");
+    expect(mapPropertyType("str")).toBe("str");
+    expect(mapPropertyType("assisted")).toBe("assisted");
+    expect(mapPropertyType("business")).toBe("business");
+    expect(mapPropertyType("mixed_use")).toBe("mixed_use");
+    expect(mapPropertyType("rv_park")).toBe("rv_park");
+  });
+
+  test("defaults unknown or missing types to mfr", () => {
+    // WHY: the dashboard's NOT-NULL property_type column needs a safe default; an unknown
+    // type must land as multifamily (mfr), never undefined.
+    expect(mapPropertyType("made_up")).toBe("mfr");
+    expect(mapPropertyType(undefined)).toBe("mfr");
+    expect(mapPropertyType("")).toBe("mfr");
   });
 });

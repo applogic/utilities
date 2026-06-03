@@ -2,7 +2,7 @@
 // actually differs; the rest pass through. Mirrors property-dashboard/validation/property.js
 // mapPropertyType (same table, same unknown -> "mfr" default) so the export URL carries the
 // real enum instead of relying on the server to convert it.
-function mapPropertyType(type) {
+export function mapPropertyType(type) {
   const typeMap = {
     assisted: "assisted",
     business: "business",

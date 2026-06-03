@@ -32,6 +32,7 @@ export {
   convertCapRateToDecimal,
   createExportObjectCore,
   formatDownPaymentPercent,
+  mapPropertyType,
 } from "./export/export-logic.js";
 
 // Date utilities
