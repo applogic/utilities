@@ -5,6 +5,7 @@
 import { computeManualOverrideNOI, resolveCapRateProvenance } from "../financial/capRate.js";
 import { calculateFinancials } from "../financial/calculateFinancials.js";
 import { FINANCIAL_CONSTANTS } from "../../config/financial.js";
+import { normalizeWhitespace } from "../../formatting/text.js";
 
 // The Listing fields every scraper must return as strings (default "Not found"). A missing or
 // non-string field means the scraper broke; the engine refuses to render/export rather than
@@ -55,6 +56,14 @@ export function createFinance({ ctx, adapter, render }) {
   function scrapeAndApply() {
     const listing = adapter.scrape();
     if (!isValidListingShape(listing)) return null;
+
+    // Normalize whitespace on every contract string field centrally, so adapters stay pure
+    // scrapers and no consumer (panel or export) ever sees the interior newlines/tabs that
+    // site markup splits text across (e.g. a broker name on two lines). "Not found" is
+    // unchanged. This is the single enforcement point for the data contract's "normalize text".
+    for (const field of LISTING_CONTRACT_FIELDS) {
+      listing[field] = normalizeWhitespace(listing[field]);
+    }
 
     const priceWasDefaulted = listing.priceWasDefaulted ?? (listing.price === "Not found");
     updateState({ priceWasDefaulted });

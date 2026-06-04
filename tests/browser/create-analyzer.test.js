@@ -295,3 +295,45 @@ describe("createAnalyzer — click-to-reveal before scrape (config.reveals)", ()
     expect(document.getElementById("prop-phone").textContent).toBe("5105022288");
   });
 });
+
+describe("createAnalyzer — engine normalizes Listing string fields", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    document.getElementById("ln-footer")?.remove();
+  });
+
+  test("interior whitespace in scraped fields is collapsed for both panel and export", async () => {
+    // WHY: site markup splits text across lines ("Kyle\n\n  Chuah"); the engine is the single
+    // enforcement point for "normalize text" so adapters stay pure scrapers and no consumer ever
+    // sees the raw whitespace. This asserts it once, centrally — every adapter inherits it.
+    vi.useFakeTimers();
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ equity: 60 }) }));
+
+    const messyListing = makeListing({
+      contact: "Kyle\n\n                 Chuah",
+      name: "820 Island Dr,\n  Alameda, CA 94502",
+    });
+    const analyzer = createAnalyzer(makeAdapter({ listing: messyListing }));
+    analyzer.runPipeline();
+    await vi.runAllTimersAsync();
+
+    expect(document.getElementById("prop-name").textContent).toBe("820 Island Dr, Alameda, CA 94502");
+    expect(document.getElementById("prop-contact").textContent).toBe("Kyle Chuah");
+
+    const exp = await analyzer.createExportObject();
+    expect(exp.address).toBe("820 Island Dr, Alameda, CA 94502");
+    expect(exp.contact).toBe("Kyle Chuah");
+  });
+
+  test("a 'Not found' field is left untouched (not mangled by normalization)", async () => {
+    // WHY: normalizeWhitespace is a no-op on the "Not found" sentinel and on a clean string, so
+    // centralizing it changes nothing for the common case — only collapses genuine messy text.
+    vi.useFakeTimers();
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ equity: 60 }) }));
+    const analyzer = createAnalyzer(makeAdapter({ listing: makeListing({ contact: "Not found" }) }));
+    analyzer.runPipeline();
+    await vi.runAllTimersAsync();
+    expect(document.getElementById("prop-contact").textContent).toBe("Not found");
+  });
+});
