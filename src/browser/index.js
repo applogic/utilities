@@ -17,6 +17,18 @@
  * @property {string} listingDate Date listed as displayed (default "Not found")
  */
 
+/**
+ * A declarative "click to reveal" step for an adapter's config.reveals. The engine runs these
+ * (runReveals) before scrape() so gated data (broker phone/email, OM access) is in the DOM.
+ *
+ * @typedef {Object} Reveal
+ * @property {string} [name]    Label for logging only.
+ * @property {string} trigger   CSS selector for the element to click (comma lists allowed).
+ * @property {string} [waitFor] CSS selector the click reveals; also the idempotency guard
+ *                              (present => already revealed, skip the click).
+ * @property {number} [timeout] ms to wait for waitFor (or a fixed delay when waitFor is absent).
+ */
+
 // Data extractors (DOM)
 export { extractBedrooms, extractPhoneNumber } from "./data/extractors.js";
 
@@ -60,6 +72,7 @@ export {
 // Widget builders
 export { createNavigationGuard } from "./widget/createNavigationGuard.js";
 export { createPanel } from "./widget/createPanel.js";
+export { runReveals } from "./widget/runReveals.js";
 
 // Analyzer engine — a site becomes a thin adapter; the engine owns everything else.
 export { createAnalyzer } from "./widget/createAnalyzer.js";

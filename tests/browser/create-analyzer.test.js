@@ -234,3 +234,64 @@ describe("createAnalyzer — cap display: active rate + reported-on-hover (T8)",
     expect(exp.capRateSource).toBe("scraped");
   });
 });
+
+describe("createAnalyzer — click-to-reveal before scrape (config.reveals)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    document.getElementById("ln-footer")?.remove();
+    document.getElementById("reveal-call")?.remove();
+  });
+
+  test("the engine reveals gated data, then scrape() reads it into the panel", async () => {
+    // WHY: this is the whole reveal contract end-to-end. A site gates the broker phone behind a
+    // Call button; the platform declares a reveal; the engine must click it BEFORE scrape so the
+    // pure scraper reads the now-present phone. If reveal ran after scrape, phone would be "Not found".
+    vi.useFakeTimers();
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ equity: 60 }) }));
+
+    // The gated trigger lives in the page (outside the panel). Clicking it reveals a tel: link.
+    const call = document.createElement("button");
+    call.id = "reveal-call";
+    call.className = "show-phone";
+    call.textContent = "Call";
+    call.addEventListener("click", () => {
+      const a = document.createElement("a");
+      a.href = "tel:5105022288";
+      a.id = "revealed-tel";
+      document.body.appendChild(a);
+    });
+    document.body.appendChild(call);
+
+    // A DOM-reading scraper: phone comes from the revealed tel: link (or "Not found").
+    const scrape = () => {
+      const tel = document.getElementById("revealed-tel");
+      return {
+        bedroomCount: null,
+        capRate: "6.5%",
+        contact: "Jane Broker",
+        listingDate: "2026-05-01",
+        name: "820 Island Dr",
+        phone: tel ? tel.getAttribute("href").replace("tel:", "") : "Not found",
+        price: "$1,299,000",
+        unitCount: 4,
+      };
+    };
+
+    const analyzer = createAnalyzer({
+      config: {
+        cssFiles: [],
+        defaultPropertyType: "multifamily",
+        reveals: [{ name: "phone", trigger: ".show-phone", waitFor: "#revealed-tel", timeout: 1500 }],
+      },
+      getListingId: () => "820-island-dr",
+      matches: () => true,
+      scrape,
+    });
+    analyzer.runPipeline();
+    await vi.runAllTimersAsync();
+
+    expect(document.getElementById("revealed-tel")).not.toBeNull();
+    expect(document.getElementById("prop-phone").textContent).toBe("5105022288");
+  });
+});

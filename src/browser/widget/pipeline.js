@@ -5,6 +5,7 @@
 
 import { createNavigationGuard } from "./createNavigationGuard.js";
 import { createPanel } from "./createPanel.js";
+import { runReveals } from "./runReveals.js";
 import {
   setupCapRateClickHandler,
   setupDiscountButtonHandler,
@@ -59,6 +60,13 @@ export function createPipeline({ adapter, config, ctx, exportOps, finance, rende
     // false and this is a no-op.
     const guard = createNavigationGuard(listingId);
     guard.capture();
+
+    // Click-to-reveal any data gated behind a button (broker phone/email, OM access) so the
+    // pure scrape() below reads it. Platform-declared (config.reveals); a no-op when absent.
+    if (config.reveals?.length) {
+      await runReveals(config.reveals);
+      if (guard.isStale()) return;
+    }
 
     const data = finance.scrapeAndApply();
     if (!data) {
