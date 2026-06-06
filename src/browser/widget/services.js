@@ -2,7 +2,7 @@
 // indicator, the 2s minimum loading, the stale-drop via the pipeline guard, the provenance +
 // fallbacks). The fetchers themselves stay pure IO in ../services. Extracted verbatim (T12).
 
-import { fetchEquity } from "../services/equity.js";
+import { fetchDebt } from "../../services/debt.js";
 import { fetchStrRevenue } from "../services/str-revenue.js";
 import { lookupLOI } from "../../services/loi-lookup.js";
 import { LOI_SENT_STATUS, MATCH_TYPES } from "../../config/loi-lookup.js";
@@ -60,10 +60,34 @@ export function createServices({ ctx }) {
     }
   }
 
-  // Equity orchestration: cache-first, panel loading indicator, 2s minimum loading, stale-drop
-  // via the pipeline guard, provenance + fallback.
-  async function loadEquity(address, guard) {
-    if (state.cachedEquity) return state.cachedEquity;
+  // Apply a fetchDebt result (or a null/failed fetch) to ctx. A numeric balance is provenance
+  // "scraped"; no number means the service had no figure, so equity falls back to 100%
+  // ("estimated"). debtLoaded guards against re-fetching when the balance is legitimately null.
+  function applyDebtResult(result, address) {
+    if (result && result.estimatedMortgageBalance !== null) {
+      updateState({
+        cachedDebtAddress: result.address,
+        cachedDebtBalance: result.estimatedMortgageBalance,
+        cachedMortgages: Array.isArray(result.currentMortgages) ? result.currentMortgages : [],
+        debtLoaded: true,
+        equitySource: "scraped",
+      });
+    } else {
+      updateState({
+        cachedDebtAddress: result?.address ?? address,
+        cachedDebtBalance: null,
+        cachedMortgages: Array.isArray(result?.currentMortgages) ? result.currentMortgages : [],
+        debtLoaded: true,
+        equitySource: "estimated",
+      });
+    }
+  }
+
+  // Debt orchestration: cache-first, panel loading indicator, 2s minimum loading, stale-drop
+  // via the pipeline guard. Stores the debt; the panel DERIVES equity from it vs the current
+  // price (render.updateEquityDisplay), so equity tracks user price edits.
+  async function loadDebt(address, guard) {
+    if (state.debtLoaded) return;
 
     updateState({ equityLoadingStartTime: Date.now() });
     const equityElement = document.getElementById("prop-equity");
@@ -72,26 +96,21 @@ export function createServices({ ctx }) {
       equityElement.textContent = "";
     }
 
-    let value = null;
+    let result = null;
     try {
-      value = await fetchEquity(address);
+      result = await fetchDebt(address);
     } catch (error) {
-      console.error("Error fetching equity:", error);
-      value = null;
+      console.error("Error fetching debt:", error);
+      result = null;
     }
 
     const elapsed = Date.now() - state.equityLoadingStartTime;
     await new Promise((resolve) => setTimeout(resolve, Math.max(0, 2000 - elapsed)));
 
-    if (guard.isStale()) return null;
+    if (guard.isStale()) return;
     if (equityElement) equityElement.classList.remove("loading");
 
-    if (value != null) {
-      updateState({ equitySource: "scraped", cachedEquity: value });
-      return value;
-    }
-    updateState({ cachedEquity: "100%*" });
-    return state.cachedEquity;
+    applyDebtResult(result, address);
   }
 
   // STR-revenue orchestration: cache-first, NOI loading indicator, stale-drop, payload
@@ -118,17 +137,28 @@ export function createServices({ ctx }) {
     }
   }
 
-  async function ensureEquityLoaded(address) {
-    if (state.cachedEquity) return state.cachedEquity;
-    try {
-      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve("100%"), 3000));
-      const equityPromise = fetchEquity(address).then((v) => v ?? "100%").catch(() => "100%");
-      return await Promise.race([equityPromise, timeoutPromise]);
-    } catch (error) {
-      console.error("❌ Error ensuring equity loaded:", error);
-      return "100%";
+  // Export-time guarantee: ensure debt is loaded (cache-first, 3s timeout => estimated), then
+  // return the debt snapshot so the export carries the balance + mortgages and a price-derived
+  // equity. Never throws; a failure becomes the "estimated" case.
+  async function ensureDebtLoaded(address) {
+    if (!state.debtLoaded) {
+      try {
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 3000));
+        const debtPromise = fetchDebt(address).catch(() => null);
+        const result = await Promise.race([debtPromise, timeoutPromise]);
+        applyDebtResult(result, address);
+      } catch (error) {
+        console.error("❌ Error ensuring debt loaded:", error);
+        applyDebtResult(null, address);
+      }
     }
+    return {
+      address: state.cachedDebtAddress,
+      balance: state.cachedDebtBalance,
+      mortgages: state.cachedMortgages,
+      source: state.equitySource,
+    };
   }
 
-  return { ensureEquityLoaded, loadEquity, loadLeadStatus, loadStrValue };
+  return { ensureDebtLoaded, loadDebt, loadLeadStatus, loadStrValue };
 }

@@ -5,7 +5,7 @@
 import { createExportObjectCore } from "../../export/export-logic.js";
 import { BUSINESS_CONSTANTS } from "../../config/business.js";
 
-export function createExportOps({ ctx, scrapeAndApply, ensureEquityLoaded }) {
+export function createExportOps({ ctx, scrapeAndApply, ensureDebtLoaded }) {
   const { state } = ctx;
 
   async function createExportObject() {
@@ -16,16 +16,17 @@ export function createExportOps({ ctx, scrapeAndApply, ensureEquityLoaded }) {
       return null;
     }
 
-    const addressForEquity = data.name && data.name !== "Property Details" ? data.name : "";
-    const cachedEquity = await ensureEquityLoaded(addressForEquity);
+    const addressForDebt = data.name && data.name !== "Property Details" ? data.name : "";
+    const debt = await ensureDebtLoaded(addressForDebt);
 
     return createExportObjectCore(data, {
-      cachedEquity,
       currentDownPaymentPercent: state.currentDownPaymentPercent,
       currentInterestRateType: state.currentInterestRateType,
+      currentMortgages: debt.mortgages,
       currentPriceDiscount: state.currentPriceDiscount,
       currentPropertyType: state.currentPropertyType,
       equitySource: state.equitySource,
+      estimatedMortgageBalance: debt.balance,
       isUsingEstimatedCapRate: state.isUsingEstimatedCapRate,
       noi: state.baseNOI,
       numberOfUnits: state.numberOfUnits,

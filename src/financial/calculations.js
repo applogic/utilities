@@ -46,6 +46,23 @@ export function calculateCashFlowYield(monthlyCashFlow, purchasePrice) {
   return (annualCashFlow / purchasePrice) * 100;
 }
 
+/**
+ * Equity as a decimal fraction of price, derived from outstanding debt.
+ * equity = (price - debtBalance) / price. Recompute whenever the user edits price.
+ * Falls back to 1 (100% equity) when debt is unavailable or price is non-positive,
+ * matching the "estimated = 100%" rule when the debt service returns no number.
+ * @param {number} price - Listing/asking/offered price.
+ * @param {number} debtBalance - Outstanding mortgage balance owing.
+ * @returns {number} Equity as a decimal (e.g. 0.59 for 59%); 1 when debt is unknown.
+ */
+export function equityPercentFromDebt(price, debtBalance) {
+  const p = Number(price);
+  const d = Number(debtBalance);
+  if (!Number.isFinite(p) || p <= 0) return 1;
+  if (!Number.isFinite(d)) return 1;
+  return (p - d) / p;
+}
+
 
 /**
  * Calculate the property price that yields a target COCR percentage

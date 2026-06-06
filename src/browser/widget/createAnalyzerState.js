@@ -44,6 +44,14 @@ export function createAnalyzerState({ defaultPropertyType = PROPERTY_TYPES.MULTI
     cachedLoiData: {},
     cachedEquity: null,
 
+    // Debt state (scraped from the /debt service; equity is DERIVED from this vs current price,
+    // so it recomputes whenever the user edits the price). cachedDebtBalance null + debtLoaded
+    // true means the service returned no figure => equity falls back to 100% ("estimated").
+    cachedDebtBalance: null,
+    cachedMortgages: [],
+    cachedDebtAddress: null,
+    debtLoaded: false,
+
     // UI state
     phoneButtonClicked: false,
     equityLoadingStartTime: null,
@@ -65,11 +73,15 @@ export function createAnalyzerState({ defaultPropertyType = PROPERTY_TYPES.MULTI
   const resetForNavigation = () => {
     Object.assign(state, {
       baseNOI: null,
+      cachedDebtAddress: null,
+      cachedDebtBalance: null,
       cachedEquity: null,
       cachedLoiData: {},
+      cachedMortgages: [],
       cachedSTRData: null,
       cachedStrValue: null,
       capManuallySet: false,
+      debtLoaded: false,
       capRateAlreadyDetermined: false,
       currentEstimatedCapRate: FINANCIAL_CONSTANTS.DEFAULT_CAP_RATE * 100,
       currentPriceDiscount: 0,

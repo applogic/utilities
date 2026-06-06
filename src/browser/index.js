@@ -80,5 +80,5 @@ export { createAnalyzerState } from "./widget/createAnalyzerState.js";
 export { calculateFinancials } from "./financial/calculateFinancials.js";
 
 // Agnostic services (pure IO; the engine orchestrates caching / loading / stale-drop)
-export { fetchEquity } from "./services/equity.js";
+export { fetchDebt } from "../services/debt.js";
 export { fetchStrRevenue } from "./services/str-revenue.js";

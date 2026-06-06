@@ -44,6 +44,39 @@ describe("createExportObjectCore", () => {
     expect(result.priceDiscountPercent).toBe(0.15);
   });
 
+  test("derives equityPercent from scraped debt vs the export price", () => {
+    // WHY: equity is no longer fetched as a %; it is (price - debt)/price. At $1,000,000 with
+    // $450,000 owing, equity is 0.55. The dashboard recomputes against asking/offered downstream.
+    const result = createExportObjectCore(baseListing, { estimatedMortgageBalance: 450000, equitySource: "scraped" });
+    expect(result.equityPercent).toBe(0.55);
+    expect(result.equitySource).toBe("scraped");
+    expect(result.estimatedMortgageBalance).toBe(450000);
+  });
+
+  test("carries the recorded liens as a JSON string", () => {
+    // WHY: the dashboard stores currentMortgages in scraped_mortgages (JSONB). Loan type matters
+    // for deal analysis, so the lien detail must survive the export hop.
+    const mortgages = [{ amount: 450000, position: "First", loanType: "Conventional", lenderName: "Logix Fcu" }];
+    const result = createExportObjectCore(baseListing, { estimatedMortgageBalance: 450000, currentMortgages: mortgages });
+    expect(JSON.parse(result.currentMortgages)).toEqual(mortgages);
+  });
+
+  test("no debt figure means 100% equity (estimated) and no debt fields", () => {
+    // WHY: the "estimated = 100%" rule when the debt service returns no number.
+    const result = createExportObjectCore(baseListing, { estimatedMortgageBalance: null, equitySource: "estimated" });
+    expect(result.equityPercent).toBe(1);
+    expect(result.equitySource).toBe("estimated");
+    expect("estimatedMortgageBalance" in result).toBe(false);
+    expect("currentMortgages" in result).toBe(false);
+  });
+
+  test("clamps underwater equity to 0 for the dashboard's equity_percent CHECK", () => {
+    // WHY: debt > price would compute negative equity, violating equity_percent >= 0. The export
+    // clamps to [0,1]; the live panel still shows the real (negative) figure.
+    const result = createExportObjectCore(baseListing, { estimatedMortgageBalance: 1500000 });
+    expect(result.equityPercent).toBe(0);
+  });
+
   test("carries the computed NOI as an additive field (rounded); capRate stays the reported value", () => {
     // WHY T2: the dashboard stores the computed NOI and derives the active cap from it, while
     // capRate keeps the REPORTED rate (7% -> 0.07). NOI is exported as a rounded integer.

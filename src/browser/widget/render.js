@@ -10,6 +10,7 @@ import {
 } from "../financial/tooltip-content-generators.js";
 import { parseCashFlowData, parseFinancialData } from "../financial/tooltip-calculations.js";
 import { computeActiveCapDisplay, parsePriceNumber, parseReportedCap } from "../financial/capRate.js";
+import { equityPercentFromDebt } from "../../financial/calculations.js";
 
 const FINANCIAL_ELEMENT_IDS = [
   "prop-noi", "prop-down", "prop-net", "prop-seller-fi", "prop-cocr-30",
@@ -90,6 +91,49 @@ export function createRender({ ctx }) {
         if (label) label.classList.add("has-tooltip");
       } else {
         updateTooltipContent(metric, tooltipContent);
+      }
+    }
+  }
+
+  // Equity is DERIVED, not fetched: (price - debt) / price against the current (discount-aware)
+  // price, so it recomputes on every price edit. No debt figure => 100% ("estimated", marked *).
+  // The hover reveals the $ debt, the recorded liens, the matched address, and how it was acquired.
+  function updateEquityDisplay() {
+    const equityElement = document.getElementById("prop-equity");
+    if (!equityElement) return;
+
+    const priceText = getCurrentPrice() || document.getElementById("prop-price")?.textContent || "";
+    const price = parsePriceNumber(priceText);
+    const debt = state.cachedDebtBalance;
+    const estimated = debt === null || debt === undefined;
+    const equity = equityPercentFromDebt(price, debt);
+    equityElement.textContent = `${Math.round(equity * 100)}%${estimated ? "*" : ""}`;
+
+    const fmtUSD = (n) => (Number.isFinite(Number(n)) ? `$${Math.round(Number(n)).toLocaleString()}` : "N/A");
+    const sourceLabel = estimated
+      ? "Estimated — no debt data, assuming 100% equity"
+      : (state.equitySource === "scraped" ? "Public records (API)" : state.equitySource);
+
+    let tooltip = `<strong>Debt owing:</strong> ${estimated ? "Unknown" : fmtUSD(debt)}`;
+    tooltip += `<br><strong>Source:</strong> ${sourceLabel}`;
+    if (state.cachedDebtAddress) tooltip += `<br><strong>Matched:</strong> ${state.cachedDebtAddress}`;
+
+    const mortgages = Array.isArray(state.cachedMortgages) ? state.cachedMortgages : [];
+    if (mortgages.length) {
+      tooltip += "<hr>" + mortgages.map((m) => {
+        const rate = (m.interestRate != null && m.interestRate !== "") ? ` @ ${m.interestRate}%` : "";
+        return `<strong>${m.position || "Lien"}:</strong> ${fmtUSD(m.amount)} ${m.loanType || ""}${rate} (${m.lenderName || "?"})`;
+      }).join("<br>");
+    }
+
+    const metric = equityElement.closest(".metric");
+    if (metric) {
+      const label = metric.querySelector(".metric-label");
+      if (!hasTooltip(metric)) {
+        attachTooltip(metric, tooltip);
+        if (label) label.classList.add("has-tooltip");
+      } else {
+        updateTooltipContent(metric, tooltip);
       }
     }
   }
@@ -204,6 +248,7 @@ export function createRender({ ctx }) {
     updateActiveCapDisplay,
     updateCapRateLabel,
     updateElement,
+    updateEquityDisplay,
     updateLeadStatusTooltip,
     updatePercentageLabels,
     updatePriceLabel,

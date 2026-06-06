@@ -1,3 +1,5 @@
+import { equityPercentFromDebt } from "../financial/calculations.js";
+
 // Map the on-screen property type to the dashboard's DB enum. Only "multifamily" -> "mfr"
 // actually differs; the rest pass through. Mirrors property-dashboard/validation/property.js
 // mapPropertyType (same table, same unknown -> "mfr" default) so the export URL carries the
@@ -19,12 +21,13 @@ export function mapPropertyType(type) {
 // a fabricated price would flow into NOI and silently land garbage in the dashboard.
 export function createExportObjectCore(data, options = {}) {
   const {
-    cachedEquity = null,
     currentDownPaymentPercent,
     currentInterestRateType = "dscr_residential",
+    currentMortgages = [],
     currentPriceDiscount = 0,
     currentPropertyType = "str",
     equitySource = "scraped",
+    estimatedMortgageBalance = null,
     isUsingEstimatedCapRate = false,
     noi = null,
     numberOfUnits = 4,
@@ -100,16 +103,25 @@ export function createExportObjectCore(data, options = {}) {
     exportData.downPaymentPercent = Math.round((currentDownPaymentPercent / 100) * 1000000) / 1000000;
   }
 
-  // 8. Equity Percent
-  if (cachedEquity && cachedEquity !== "Loading...") {
-    const equityMatch = cachedEquity.match(/[\d.]+/);
-    if (equityMatch) {
-      exportData.equityPercent = Math.round((parseFloat(equityMatch[0]) / 100) * 1000000) / 1000000;
-    }
+  // 8. Equity Percent — DERIVED from scraped debt vs the export price (no debt => 100%).
+  // Clamped to [0,1] for the dashboard's equity_percent CHECK; the live panel shows reality.
+  if (Number.isFinite(exportData.price) && exportData.price > 0) {
+    const equity = equityPercentFromDebt(exportData.price, estimatedMortgageBalance);
+    const clamped = Math.max(0, Math.min(1, equity));
+    exportData.equityPercent = Math.round(clamped * 1000000) / 1000000;
   }
 
   // 9. Equity Source
   exportData.equitySource = equitySource;
+
+  // 9b. Scraped debt (additive; dashboard stores estimated_debt_balance + scraped_mortgages,
+  // distinct from the loan_1/2/3 due-diligence slots). Omitted when there is no figure.
+  if (Number.isFinite(estimatedMortgageBalance)) {
+    exportData.estimatedMortgageBalance = Math.round(estimatedMortgageBalance);
+  }
+  if (Array.isArray(currentMortgages) && currentMortgages.length > 0) {
+    exportData.currentMortgages = JSON.stringify(currentMortgages);
+  }
 
   // 10. Number of Units
   exportData.numberOfUnits = numberOfUnits;

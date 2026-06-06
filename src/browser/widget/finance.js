@@ -115,6 +115,7 @@ export function createFinance({ ctx, adapter, render }) {
     const financials = await calculateFinancials(ctx, priceText, capRateText, state.currentPropertyType, address);
     render.applyFinancials(financials);
     render.updateActiveCapDisplay();
+    render.updateEquityDisplay();
   }
 
   return { applyCapRate, handlePropertyTypeChange, recalculateFinancials, scrapeAndApply };

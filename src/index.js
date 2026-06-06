@@ -20,9 +20,13 @@ export {
   calculatePriceForCOCR,
   calculatePriceFromDiscount,
   calculateSTRNOI,
+  equityPercentFromDebt,
   resolveListingFinancials,
   safePercentage,
 } from "./financial/calculations.js";
+
+// Agnostic debt service (pure IO; Node + browser)
+export { fetchDebt } from "./services/debt.js";
 
 // Financial formatters
 export { formatCurrency, formatPriceValue, formatPercentage } from "./financial/formatters.js";

@@ -65,8 +65,11 @@ describe("createAnalyzer — scrape + cap-rate application via export", () => {
   afterEach(() => vi.restoreAllMocks());
 
   beforeEach(() => {
-    // ensureEquityLoaded -> fetchEquity hits global.fetch; resolve it fast and deterministically.
-    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ equity: 60 }) }));
+    // ensureDebtLoaded -> fetchDebt hits global.fetch; resolve it fast and deterministically.
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ address: "820 Island Dr", currentMortgages: [], estimatedMortgageBalance: 400000 }),
+    }));
   });
 
   test("a real reported cap exports as scraped (not estimated)", async () => {
@@ -123,7 +126,12 @@ describe("createAnalyzer — full pipeline render (jsdom)", () => {
     // resolve the cap, compute financials, and paint the metrics. A populated #prop-noi (not
     // "Loading..."/"N/A") proves the pipeline wired calculateFinancials to the panel correctly.
     vi.useFakeTimers();
-    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ equity: 55 }) }));
+    // The /debt service returns the outstanding balance; equity is DERIVED as (price - debt)/price.
+    // price 1,299,000 with debt 584,550 => equity exactly 0.55 (55%).
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ address: "820 Island Dr", currentMortgages: [], estimatedMortgageBalance: 584550 }),
+    }));
 
     const analyzer = createAnalyzer(makeAdapter({ listing: makeListing({ capRate: "6.5%" }) }));
     analyzer.runPipeline();

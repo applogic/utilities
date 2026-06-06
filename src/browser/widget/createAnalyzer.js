@@ -44,7 +44,7 @@ export function createAnalyzer(adapter) {
   const services = createServices({ ctx });
   const exportOps = createExportOps({
     ctx,
-    ensureEquityLoaded: services.ensureEquityLoaded,
+    ensureDebtLoaded: services.ensureDebtLoaded,
     scrapeAndApply: finance.scrapeAndApply,
   });
   const pipeline = createPipeline({ adapter, config, ctx, exportOps, finance, render, resolveCssUrls, services });

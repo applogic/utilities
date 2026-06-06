@@ -121,9 +121,9 @@ export function createPipeline({ adapter, config, ctx, exportOps, finance, rende
       if (guard.isStale()) return;
     }
 
-    const equity = await services.loadEquity(data.name, guard);
+    await services.loadDebt(data.name, guard);
     if (guard.isStale()) return;
-    render.updateElement("prop-equity", equity);
+    render.updateEquityDisplay();
   }
 
   // One running pipeline at a time. Re-runnable so the SPA watcher can rebuild per listing;
