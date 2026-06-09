@@ -164,6 +164,99 @@ export function setupCapRateClickHandler(capElement, capLabelElement, callbacks)
   capLabelElement.style.cursor = "pointer";
 }
 
+// Manual STR-gross entry on the NOI cell (STR mode only). Clicking the NOI value swaps in an
+// inline input; committing a positive number stores it as the measured STR gross
+// (cachedStrValue {value, type:"gross"}) — the SAME seam the dormant str-revenue backend would
+// fill — so calculateFinancials applies NOI = gross x NOI_PERCENTAGE. baseNOI is cleared so the
+// type model recomputes, and capManuallySet is cleared so a prior cap-click override does not
+// clobber the gross. Clicking the NOI label resets to the 5.5%-of-price estimate.
+export function setupNoiClickHandler(noiElement, noiLabelElement, callbacks) {
+  if (!noiElement || !noiLabelElement) return;
+
+  if (noiElement.dataset.handlerAttached === "true") return;
+  noiElement.dataset.handlerAttached = "true";
+
+  const { state, updateState } = callbacks;
+
+  function commit(raw) {
+    const match = String(raw).match(/[\d,.]+/);
+    const value = match ? parseFloat(match[0].replace(/,/g, "")) : NaN;
+    if (Number.isFinite(value) && value > 0) {
+      updateState({ cachedStrValue: { value, type: "gross" }, baseNOI: null, capManuallySet: false });
+    }
+    callbacks.recalculateFinancials();
+  }
+
+  noiElement.addEventListener("click", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (state.currentPropertyType !== "str") return;
+    if (noiElement.querySelector("input")) return;
+
+    const current = state.cachedStrValue && Number.isFinite(state.cachedStrValue.value)
+      ? String(state.cachedStrValue.value)
+      : "";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = current;
+    input.placeholder = "Awning gross $/yr";
+    input.className = "noi-input";
+    input.style.width = "92px";
+    noiElement.textContent = "";
+    noiElement.appendChild(input);
+    input.focus();
+    input.select();
+
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      if (save) commit(input.value);
+      else callbacks.recalculateFinancials();
+    };
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); finish(true); }
+      else if (ev.key === "Escape") { ev.preventDefault(); finish(false); }
+    });
+    input.addEventListener("blur", () => finish(true));
+  });
+
+  noiLabelElement.addEventListener("click", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (state.currentPropertyType !== "str") return;
+    updateState({ cachedStrValue: null, baseNOI: null });
+    callbacks.recalculateFinancials();
+  });
+
+  noiElement.style.cursor = "pointer";
+  noiLabelElement.style.cursor = "pointer";
+}
+
+// The "↗ Awning" affordance next to NOI: copy the current address to the clipboard and open
+// Awning's public calculator in a new tab, so the analyst pastes the address, reads the gross
+// revenue, and types it back into the NOI cell (setupNoiClickHandler). Read the address from
+// the live #prop-name so SPA navigation can't bind a stale value.
+export function setupAwningLinkHandler(linkElement) {
+  if (!linkElement) return;
+
+  if (linkElement.dataset.handlerAttached === "true") return;
+  linkElement.dataset.handlerAttached = "true";
+
+  linkElement.addEventListener("click", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const address = document.getElementById("prop-name")?.textContent?.trim() || "";
+    if (address && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(address).catch(() => {});
+    }
+    window.open("https://awning.com/airbnb-calculator", "_blank", "noopener");
+  });
+}
+
 export function setupDownPaymentClickHandler(downElement, downLabelElement, callbacks) {
   if (!downElement || !downLabelElement) return;
 

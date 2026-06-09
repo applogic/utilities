@@ -11,6 +11,8 @@ import {
 import { parseCashFlowData, parseFinancialData } from "../financial/tooltip-calculations.js";
 import { computeActiveCapDisplay, parsePriceNumber, parseReportedCap } from "../financial/capRate.js";
 import { equityPercentFromDebt } from "../../financial/calculations.js";
+import { formatCurrency } from "../../financial/formatters.js";
+import { PROPERTY_TYPE_CONSTANTS } from "../../config/property-types.js";
 
 const FINANCIAL_ELEMENT_IDS = [
   "prop-noi", "prop-down", "prop-net", "prop-seller-fi", "prop-cocr-30",
@@ -211,6 +213,44 @@ export function createRender({ ctx }) {
     }
   }
 
+  // STR affordances: the Awning link and the click-to-edit NOI cell exist only in STR mode.
+  // When a manual STR gross is active (cachedStrValue), mark the painted NOI with a trailing *
+  // and a source tooltip — mirroring the cap-rate/equity "*" convention. Runs after the metric
+  // paint so the * is appended to the freshly-set NOI text (and re-applied on every recalc).
+  function updateStrAffordances() {
+    const isStr = state.currentPropertyType === "str";
+
+    const awningLink = document.getElementById("prop-noi-awning");
+    if (awningLink) awningLink.style.display = isStr ? "inline-block" : "none";
+
+    const noiElement = document.getElementById("prop-noi");
+    if (!noiElement) return;
+    noiElement.style.cursor = isStr ? "pointer" : "";
+    if (noiElement.querySelector("input")) return;
+
+    const metric = noiElement.closest(".metric");
+    const manual = isStr && state.cachedStrValue && Number.isFinite(state.cachedStrValue.value);
+
+    if (manual) {
+      noiElement.textContent = `${noiElement.textContent}*`;
+      const gross = state.cachedStrValue.value;
+      const pct = PROPERTY_TYPE_CONSTANTS.STR.NOI_PERCENTAGE;
+      const tip = `<strong>Manual STR gross (Awning):</strong> ${formatCurrency(gross)}/yr`
+        + `<br>NOI = gross &times; ${Math.round(pct * 100)}% = ${formatCurrency(gross * pct)}`
+        + `<hr><em>Click NOI to edit; click the label to reset to the estimate.</em>`;
+      if (metric) {
+        if (!hasTooltip(metric)) {
+          attachTooltip(metric, tip);
+          metric.querySelector(".metric-label")?.classList.add("has-tooltip");
+        } else {
+          updateTooltipContent(metric, tip);
+        }
+      }
+    } else if (isStr && metric && hasTooltip(metric)) {
+      updateTooltipContent(metric, "<strong>STR NOI:</strong> 5.5%-of-price estimate.<hr><em>Click NOI to enter Awning's gross revenue.</em>");
+    }
+  }
+
   function applyFinancials(financials) {
     let isCashFlowNegative = false;
     if (financials) {
@@ -237,6 +277,7 @@ export function createRender({ ctx }) {
     }
 
     updatePercentageLabels();
+    updateStrAffordances();
     const footer = document.getElementById("ln-footer");
     if (footer) footer.classList.toggle("negative", isCashFlowNegative);
   }

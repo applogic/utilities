@@ -59,6 +59,19 @@ describe("calculateFinancials hoist — per-type NOI is byte-identical to the As
     expect(result.rawNOI).toBeCloseTo(71445, 4);
   });
 
+  test("STR: a manual gross (cachedStrValue) drives NOI = gross x 55%, not the price estimate", async () => {
+    // WHY: clicking the NOI cell to type Awning's gross stores cachedStrValue {value, type:"gross"} —
+    // the SAME measured seam the dormant str-revenue backend would fill. NOI must become
+    // gross x NOI_PERCENTAGE (0.55), independent of price/cap, and memoize into baseNOI. This is
+    // the manual-override path the Awning workflow depends on; if it regressed to the price
+    // estimate, the analyst's typed Awning number would be silently ignored.
+    const ctx = makeCtx({ cachedStrValue: { value: 120000, type: "gross" } });
+    const result = await calculateFinancials(ctx, PRICE, REPORTED_CAP, "str", "820 Island Dr");
+    expect(result.rawNOI).toBeCloseTo(120000 * 0.55, 4);
+    expect(result.rawNOI).toBeCloseTo(66000, 4);
+    expect(ctx.state.baseNOI).toBe(result.rawNOI);
+  });
+
   test("assisted: NOI = bedrooms x $1,500 x 12 (7 beds -> 126,000)", async () => {
     // WHY 7*1500*12: assisted NOI is bedroom-driven (numberOfUnits doubles as the bed count),
     // independent of price or cap. The Assignment's assisted figure is $126,000 at 7 beds.

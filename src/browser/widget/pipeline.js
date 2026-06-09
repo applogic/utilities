@@ -7,9 +7,11 @@ import { createNavigationGuard } from "./createNavigationGuard.js";
 import { createPanel } from "./createPanel.js";
 import { runReveals } from "./runReveals.js";
 import {
+  setupAwningLinkHandler,
   setupCapRateClickHandler,
   setupDiscountButtonHandler,
   setupDownPaymentClickHandler,
+  setupNoiClickHandler,
   setupPriceClickHandler,
 } from "../ui/click-handlers.js";
 import { calculateFinancials } from "../financial/calculateFinancials.js";
@@ -49,6 +51,10 @@ export function createPipeline({ adapter, config, ctx, exportOps, finance, rende
 
     const downElement = document.getElementById("prop-down");
     setupDownPaymentClickHandler(downElement, downElement?.closest(".metric")?.querySelector(".metric-label"), callbacks);
+
+    const noiElement = document.getElementById("prop-noi");
+    setupNoiClickHandler(noiElement, noiElement?.closest(".metric")?.querySelector(".metric-label"), callbacks);
+    setupAwningLinkHandler(document.getElementById("prop-noi-awning"));
 
     setupDiscountButtonHandler(document.getElementById("ln-discount-btn"), callbacks);
   }

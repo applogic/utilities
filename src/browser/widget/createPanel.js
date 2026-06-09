@@ -112,6 +112,7 @@ function createPanelElements(defaultPropertyType, callbacks) {
             <div class="metric">
               <span class="metric-label">NOI</span>
               <span id="prop-noi" class="metric-value prop-noi">Loading...</span>
+              <a id="prop-noi-awning" class="noi-awning-link" target="_blank" rel="noopener" title="Open Awning's calculator and copy this address to the clipboard" style="display:none;cursor:pointer;font-size:11px;font-weight:600;color:#200955;text-decoration:none;margin-top:2px;">↗ Awning</a>
             </div>
           </div>
 
