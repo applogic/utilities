@@ -413,6 +413,64 @@ describe("createAnalyzer — progressive fill for late client-rendered fields", 
   });
 });
 
+describe("createAnalyzer — waits for a scrapeable price (SPA overlay)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    document.getElementById("ln-footer")?.remove();
+    document.getElementById("late-price")?.remove();
+  });
+
+  test("holds the render until the price paints, then computes a real NOI (no N/A flash)", async () => {
+    // WHY: on a Zillow search->listing SPA navigation there is no server render — the price is
+    // client-painted a beat after the pipeline fires. An eager scrape would read no price and paint
+    // N/A everywhere with no recovery (the late-field poll only refreshes contact/phone/date). The
+    // engine must hold the main render until the price is scrapeable, then compute real numbers.
+    vi.useFakeTimers();
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ equity: 60 }) }));
+
+    // Price is absent until the overlay paints #late-price; until then the listing reports no price.
+    const scrape = () => {
+      const painted = !!document.getElementById("late-price");
+      return {
+        bedroomCount: null,
+        capRate: "6.5%",
+        contact: "Jane Broker",
+        listingDate: "2026-05-01",
+        name: "820 Island Dr",
+        phone: "555-1234",
+        price: painted ? "$1,299,000" : "Not found",
+        priceWasDefaulted: !painted,
+        unitCount: 4,
+      };
+    };
+
+    const analyzer = createAnalyzer({
+      config: { cssFiles: [], defaultPropertyType: "multifamily" },
+      getListingId: () => "820-island-dr",
+      matches: () => true,
+      scrape,
+    });
+    analyzer.runPipeline();
+
+    // Panel built, but the price has NOT painted yet — the render must not have committed.
+    await vi.advanceTimersByTimeAsync(400);
+    expect(document.getElementById("prop-noi").textContent).toBe("Loading...");
+
+    // The overlay paints the price a beat later; the data-ready poll/observer picks it up.
+    const painted = document.createElement("div");
+    painted.id = "late-price";
+    document.body.appendChild(painted);
+    await vi.runAllTimersAsync();
+
+    const noi = document.getElementById("prop-noi").textContent;
+    expect(noi).not.toBe("N/A");
+    expect(noi).not.toBe("Loading...");
+    // MF NOI = 1,299,000 x 0.065 = 84,435 -> formatted currency.
+    expect(noi.startsWith("$")).toBe(true);
+  });
+});
+
 describe("createAnalyzer — engine normalizes Listing string fields", () => {
   afterEach(() => {
     vi.restoreAllMocks();

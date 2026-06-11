@@ -4,6 +4,7 @@
 
 import { computeManualOverrideNOI, resolveCapRateProvenance } from "../financial/capRate.js";
 import { calculateFinancials } from "../financial/calculateFinancials.js";
+import { syncInterestRateForUnits } from "./interestRateSync.js";
 import { FINANCIAL_CONSTANTS } from "../../config/financial.js";
 import { normalizeWhitespace } from "../../formatting/text.js";
 
@@ -83,6 +84,7 @@ export function createFinance({ ctx, adapter, render }) {
     updateState({ currentPropertyType: newType });
     if (newType !== "str") updateState({ cachedSTRData: null });
     updateState({ baseNOI: null });
+    syncInterestRateForUnits(state, updateState);
     return newType;
   }
 

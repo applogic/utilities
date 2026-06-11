@@ -8,6 +8,8 @@
 //   - callbacks.onExportClick / onPropertyTypeChange / onInterestRateTypeChange: optional notifications
 //     (today these are CustomEvent dispatches; callers that need them pass a handler, others omit)
 
+import { syncInterestRateForUnits } from "./interestRateSync.js";
+
 const PROPERTY_TYPE_OPTIONS = [
   { value: "multifamily", label: "Multifamily" },
   { value: "str", label: "STR" },
@@ -251,18 +253,8 @@ function createPanelElements(defaultPropertyType, callbacks) {
       const value = parseInt(unitsInput.value) || 4;
       updateState({ numberOfUnits: value });
 
-      const irDropdown = document.getElementById("ln-interest-rate-type");
-      if (irDropdown) {
-        if (value > 11 && irDropdown.value !== "dscr_commercial") {
-          irDropdown.value = "dscr_commercial";
-          updateState({ currentInterestRateType: "dscr_commercial" });
-          callbacks.onInterestRateTypeChange?.("dscr_commercial");
-        } else if (value <= 11 && irDropdown.value === "dscr_commercial") {
-          irDropdown.value = "dscr_residential";
-          updateState({ currentInterestRateType: "dscr_residential" });
-          callbacks.onInterestRateTypeChange?.("dscr_residential");
-        }
-      }
+      const newRateType = callbacks.state && syncInterestRateForUnits(callbacks.state, updateState, value);
+      if (newRateType) callbacks.onInterestRateTypeChange?.(newRateType);
     });
   }
 

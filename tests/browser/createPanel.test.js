@@ -79,17 +79,42 @@ describe("createPanel", () => {
     expect(callbacks.onInterestRateTypeChange).toHaveBeenCalledWith("commercial");
   });
 
-  test("units > 11 auto-switches the loan tier to dscr_commercial", () => {
-    // WHY: the units input carries business logic — above 11 units the financing flips to
-    // commercial. Losing this in extraction would silently misprice large multifamily deals.
-    const callbacks = buildPanel();
+  test("MFR with more than 4 units auto-switches the loan tier to dscr_commercial", () => {
+    // WHY: a multifamily property of 5+ units is commercial financing (DSCR Com, 10%), not
+    // residential. Losing this would silently misprice every large multifamily deal at 8%.
+    const callbacks = buildPanel({ callbacks: { state: { currentPropertyType: "multifamily" } } });
+    const units = document.getElementById("ln-units-input");
+    units.value = "5";
+    units.dispatchEvent(new Event("change"));
+
+    expect(callbacks.updateState).toHaveBeenCalledWith({ numberOfUnits: 5 });
+    expect(document.getElementById("ln-interest-rate-type").value).toBe("dscr_commercial");
+    expect(callbacks.onInterestRateTypeChange).toHaveBeenCalledWith("dscr_commercial");
+  });
+
+  test("MFR dropping to 4 or fewer units reverts the loan tier to dscr_residential", () => {
+    // WHY: the switch is reversible — editing units back below 5 must restore the residential
+    // tier, otherwise a corrected unit count keeps the deal mispriced at the commercial rate.
+    const callbacks = buildPanel({ callbacks: { state: { currentPropertyType: "multifamily" } } });
+    document.getElementById("ln-interest-rate-type").value = "dscr_commercial";
+    const units = document.getElementById("ln-units-input");
+    units.value = "4";
+    units.dispatchEvent(new Event("change"));
+
+    expect(document.getElementById("ln-interest-rate-type").value).toBe("dscr_residential");
+    expect(callbacks.onInterestRateTypeChange).toHaveBeenCalledWith("dscr_residential");
+  });
+
+  test("non-MFR property is never force-switched by unit count", () => {
+    // WHY: the 5+ unit rule is multifamily-specific. Commercial / mixed-use / RV listings keep
+    // their own tier; a large unit count must not hijack their interest-rate selection.
+    const callbacks = buildPanel({ callbacks: { state: { currentPropertyType: "business" } } });
     const units = document.getElementById("ln-units-input");
     units.value = "12";
     units.dispatchEvent(new Event("change"));
 
-    expect(callbacks.updateState).toHaveBeenCalledWith({ numberOfUnits: 12 });
-    expect(document.getElementById("ln-interest-rate-type").value).toBe("dscr_commercial");
-    expect(callbacks.onInterestRateTypeChange).toHaveBeenCalledWith("dscr_commercial");
+    expect(document.getElementById("ln-interest-rate-type").value).toBe("dscr_residential");
+    expect(callbacks.onInterestRateTypeChange).not.toHaveBeenCalled();
   });
 
   test("optional event callbacks may be omitted without throwing", () => {

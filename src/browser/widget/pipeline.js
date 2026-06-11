@@ -6,6 +6,7 @@
 import { createNavigationGuard } from "./createNavigationGuard.js";
 import { createPanel } from "./createPanel.js";
 import { runReveals } from "./runReveals.js";
+import { syncInterestRateForUnits } from "./interestRateSync.js";
 import {
   setupAwningLinkHandler,
   setupCapRateClickHandler,
@@ -26,6 +27,15 @@ import { normalizeWhitespace } from "../../formatting/text.js";
 // so it stays bounded and predictable under heavy DOM churn.
 const LATE_FIELD_TIMEOUT = 10000;
 const LATE_FIELD_POLL_INTERVAL = 300;
+
+// The main render waits for the page to expose a scrapeable PRICE before it commits — price is the
+// field every financial metric derives from. On a full page load the server-rendered JSON-LD has it
+// immediately; on an SPA overlay (Zillow search -> listing) it is client-painted a beat after the
+// navigation fires, so an eager scrape would read no price and paint N/A everywhere with no recovery.
+// If the price never becomes scrapeable (a genuinely price-less/off-market listing) the timeout lets
+// the render proceed anyway, so the panel never hangs on "Loading..." — it shows the honest no-price state.
+const DATA_READY_TIMEOUT = 8000;
+const DATA_READY_POLL_INTERVAL = 300;
 
 export function createPipeline({ adapter, config, ctx, exportOps, finance, render, resolveCssUrls, services }) {
   const { state, updateState } = ctx;
@@ -131,13 +141,7 @@ export function createPipeline({ adapter, config, ctx, exportOps, finance, rende
     const unitsInput = document.getElementById("ln-units-input");
     if (unitsInput) unitsInput.value = unitCount;
 
-    if (unitCount > 11) {
-      const irDropdown = document.getElementById("ln-interest-rate-type");
-      if (irDropdown && irDropdown.value !== "dscr_commercial") {
-        irDropdown.value = "dscr_commercial";
-        updateState({ currentInterestRateType: "dscr_commercial" });
-      }
-    }
+    syncInterestRateForUnits(state, updateState, unitCount);
 
     render.updateElement("prop-name", data.name);
     // Display guard (H2): a defaulted price shows "No price"; the metrics fall through to N/A.
@@ -217,41 +221,56 @@ export function createPipeline({ adapter, config, ctx, exportOps, finance, rende
       await updateFooterData();
     };
 
-    const tryImmediateUpdate = () => {
+    const stopObserver = () => {
+      if (pipelineObserver) {
+        pipelineObserver.disconnect();
+        pipelineObserver = null;
+      }
+    };
+
+    // The panel's own elements are built (createPanel's async append finished).
+    const panelReady = () => {
       const nameEl = document.getElementById("prop-name");
       const priceEl = document.getElementById("prop-price");
-      if (nameEl && priceEl && nameEl.textContent.trim() && priceEl.textContent.trim()) {
-        runUpdateOnce();
-        return true;
-      }
-      return false;
+      return !!(nameEl && priceEl && nameEl.textContent.trim() && priceEl.textContent.trim());
+    };
+
+    // The page exposes a real, scrapeable price (see DATA_READY_* above). Pure read — no state writes.
+    const priceReady = () => {
+      const listing = adapter.scrape();
+      return !!listing && listing.price !== "Not found" && !listing.priceWasDefaulted;
+    };
+
+    // Run the main update once the panel is built AND the price is scrapeable. `force` (the timeout
+    // path) commits even without a price so a price-less listing renders its honest no-price state.
+    const tryImmediateUpdate = (force = false) => {
+      if (!panelReady()) return false;
+      if (!force && !priceReady()) return false;
+      runUpdateOnce();
+      return true;
     };
 
     if (tryImmediateUpdate()) return;
 
-    pipelineObserver = new MutationObserver((mutations, obs) => {
-      if (tryImmediateUpdate()) {
-        obs.disconnect();
-        pipelineObserver = null;
-      }
+    pipelineObserver = new MutationObserver(() => {
+      if (tryImmediateUpdate()) stopObserver();
     });
     pipelineObserver.observe(document.body, { childList: true, subtree: true });
 
-    // Safety fallback before the page has loaded; SPA navigations fire after load, so the
-    // observer (not load) drives those.
-    if (document.readyState !== "complete") {
-      window.addEventListener("load", () => {
-        setTimeout(() => {
-          if (!footerUpdated) {
-            runUpdateOnce();
-            if (pipelineObserver) {
-              pipelineObserver.disconnect();
-              pipelineObserver = null;
-            }
-          }
-        }, 5000);
-      });
-    }
+    // Bounded fallback for SPA overlays (already readyState "complete", so the load event never
+    // fires) and for listings whose price never paints: poll until the price is scrapeable, then
+    // force the render at the timeout so the panel never hangs on "Loading...".
+    let waited = 0;
+    const fallbackPoll = () => {
+      if (footerUpdated) return;
+      if (tryImmediateUpdate(waited >= DATA_READY_TIMEOUT)) {
+        stopObserver();
+        return;
+      }
+      waited += DATA_READY_POLL_INTERVAL;
+      setTimeout(fallbackPoll, DATA_READY_POLL_INTERVAL);
+    };
+    setTimeout(fallbackPoll, DATA_READY_POLL_INTERVAL);
   }
 
   return { runPipeline, updateFooterData };

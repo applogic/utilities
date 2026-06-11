@@ -53,3 +53,47 @@ describe("createNav.handleNavigation", () => {
     expect(runPipeline).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("createNav.setupSpaWatcher — URL poll fallback", () => {
+  // Save/restore the History methods setupSpaWatcher patches so the wrapper does not leak.
+  let originalPushState;
+  let originalReplaceState;
+
+  afterEach(() => {
+    history.pushState = originalPushState;
+    history.replaceState = originalReplaceState;
+    vi.useRealTimers();
+  });
+
+  test("a navigation that bypasses the patched History methods is still caught by the poll", () => {
+    // WHY: Next.js (Zillow) navigates by calling a private reference to history.pushState it
+    // captured before our content script patched it, so the patched methods never fire and the
+    // panel would stay on the old listing until a full reload. The URL poll catches the listing-id
+    // change regardless of how it was triggered — here the id flips with NO pushState/popstate.
+    vi.useFakeTimers();
+    originalPushState = history.pushState;
+    originalReplaceState = history.replaceState;
+
+    let id = "listing-1";
+    const ctx = makeCtx();
+    const runPipeline = vi.fn();
+    const nav = createNav({
+      adapter: { getListingId: () => id, matches: () => true, scrape: () => ({}) },
+      config: {},
+      ctx,
+      runPipeline,
+    });
+    nav.setupSpaWatcher();
+
+    // Framework navigates without touching the patched History API.
+    id = "listing-2";
+    vi.advanceTimersByTime(400);
+
+    expect(ctx.resetForNavigation).toHaveBeenCalledTimes(1);
+    expect(runPipeline).toHaveBeenCalledTimes(1);
+
+    // A subsequent poll with no further change must not re-fire (idempotent on a stable URL).
+    vi.advanceTimersByTime(400);
+    expect(runPipeline).toHaveBeenCalledTimes(1);
+  });
+});
