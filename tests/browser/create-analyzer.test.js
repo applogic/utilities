@@ -304,6 +304,115 @@ describe("createAnalyzer — click-to-reveal before scrape (config.reveals)", ()
   });
 });
 
+describe("createAnalyzer — progressive fill for late client-rendered fields", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    document.getElementById("ln-footer")?.remove();
+    document.getElementById("agent-attr")?.remove();
+    document.getElementById("listed-row")?.remove();
+  });
+
+  test("agent/phone/listing-date that render after first paint fill in on a later poll", async () => {
+    // WHY: Zillow client-renders the listing-agent attribution and price-history row a beat after
+    // load, so the pipeline's single initial scrape reads "Not found" for contact/phone/date. The
+    // engine must keep re-reading those display fields and fill them in when they arrive — without
+    // re-running financials or network calls. Proven here: "Not found" at first paint, real values
+    // after the late DOM appears and one poll tick fires.
+    vi.useFakeTimers();
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ equity: 60 }) }));
+
+    // A DOM-reading scraper: agent/phone come from a late attribution block; date from a late row.
+    const scrape = () => {
+      const agent = document.getElementById("agent-attr");
+      const row = document.getElementById("listed-row");
+      const spans = agent ? agent.querySelectorAll("span") : [];
+      return {
+        bedroomCount: null,
+        capRate: "6.5%",
+        contact: agent ? spans[0].textContent : "Not found",
+        listingDate: row ? "6/5/2026" : "Not found",
+        name: "820 Island Dr",
+        phone: agent ? spans[1].textContent : "Not found",
+        price: "$1,299,000",
+        unitCount: 4,
+      };
+    };
+
+    const analyzer = createAnalyzer({
+      config: { cssFiles: [], defaultPropertyType: "multifamily" },
+      getListingId: () => "820-island-dr",
+      matches: () => true,
+      scrape,
+    });
+    analyzer.runPipeline();
+
+    // Panel built + initial render done; the late sections are NOT in the DOM yet.
+    await vi.advanceTimersByTimeAsync(200);
+    expect(document.getElementById("prop-contact").textContent).toBe("Not found");
+    expect(document.getElementById("prop-phone").textContent).toBe("Not found");
+    expect(document.getElementById("prop-dom").textContent).toBe("Not found");
+
+    // The site client-renders the agent attribution + price-history row a beat later.
+    const agent = document.createElement("p");
+    agent.id = "agent-attr";
+    agent.innerHTML = `<span>Rich Ramsey</span><span>615-347-9799</span>`;
+    document.body.appendChild(agent);
+    const row = document.createElement("tr");
+    row.id = "listed-row";
+    document.body.appendChild(row);
+
+    // One poll interval picks them up.
+    await vi.advanceTimersByTimeAsync(400);
+    expect(document.getElementById("prop-contact").textContent).toBe("Rich Ramsey");
+    expect(document.getElementById("prop-phone").textContent).toBe("615-347-9799");
+    expect(document.getElementById("prop-dom").textContent).not.toBe("Not found");
+    expect(document.getElementById("prop-dom").textContent).toContain("2026");
+  });
+
+  test("the late-field poll abandons when the page navigated to another listing", async () => {
+    // WHY nav-safety: on an SPA the user can leave listing A before its agent block renders. A
+    // stale poll must NOT write A's agent onto B's panel — the guard stops it. Mirrors the same
+    // isStale() drop the async services use between awaits.
+    vi.useFakeTimers();
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ equity: 60 }) }));
+
+    let currentId = "listing-A";
+    const scrape = () => {
+      const agent = document.getElementById("agent-attr");
+      return {
+        bedroomCount: null,
+        capRate: "6.5%",
+        contact: agent ? "Rich Ramsey" : "Not found",
+        listingDate: "Not found",
+        name: "820 Island Dr",
+        phone: agent ? "615-347-9799" : "Not found",
+        price: "$1,299,000",
+        unitCount: 4,
+      };
+    };
+
+    const analyzer = createAnalyzer({
+      config: { cssFiles: [], defaultPropertyType: "multifamily" },
+      getListingId: () => currentId,
+      matches: () => true,
+      scrape,
+    });
+    analyzer.runPipeline();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(document.getElementById("prop-contact").textContent).toBe("Not found");
+
+    // Navigate away, THEN listing A's agent block finally renders.
+    currentId = "listing-B";
+    const agent = document.createElement("p");
+    agent.id = "agent-attr";
+    document.body.appendChild(agent);
+    await vi.advanceTimersByTimeAsync(400);
+
+    expect(document.getElementById("prop-contact").textContent).toBe("Not found");
+  });
+});
+
 describe("createAnalyzer — engine normalizes Listing string fields", () => {
   afterEach(() => {
     vi.restoreAllMocks();

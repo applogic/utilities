@@ -16,6 +16,16 @@ import {
 } from "../ui/click-handlers.js";
 import { calculateFinancials } from "../financial/calculateFinancials.js";
 import { calculateDOM } from "../../date/utilities.js";
+import { normalizeWhitespace } from "../../formatting/text.js";
+
+// Some sites (e.g. Zillow) client-render parts of a listing — the listing-agent attribution and
+// the price-history table — a beat AFTER first paint, so the pipeline's single initial scrape
+// reads "Not found" for the fields they carry (contact, phone, listing date). After the first
+// render we poll the pure scrape() for just those display fields and fill them in as they arrive,
+// until all are present or this budget elapses. Poll-count based (like runReveals' waitForSelector)
+// so it stays bounded and predictable under heavy DOM churn.
+const LATE_FIELD_TIMEOUT = 10000;
+const LATE_FIELD_POLL_INTERVAL = 300;
 
 export function createPipeline({ adapter, config, ctx, exportOps, finance, render, resolveCssUrls, services }) {
   const { state, updateState } = ctx;
@@ -57,6 +67,41 @@ export function createPipeline({ adapter, config, ctx, exportOps, finance, rende
     setupAwningLinkHandler(document.getElementById("prop-noi-awning"));
 
     setupDiscountButtonHandler(document.getElementById("ln-discount-btn"), callbacks);
+  }
+
+  // Progressive fill for fields a site renders after first paint (see LATE_FIELD_* above).
+  // Re-reads ONLY the scrape-derived display fields (contact, phone, listing date) via the pure
+  // adapter.scrape() — never scrapeAndApply, so it touches no state and re-applies no cap rate —
+  // and updates only those three elements; price/NOI/financials and all network calls are left
+  // alone. Stops as soon as every field is present (so a server-rendered site like LoopNet, where
+  // the first read already has them, never starts a poll), when the budget elapses, or when the
+  // page navigated to another listing (guard). Whitespace is normalized here to match the
+  // contract's single normalization point in finance.scrapeAndApply (e.g. a broker name that the
+  // markup splits across lines).
+  function watchLateFields(guard) {
+    const isPresent = (value) => typeof value === "string" && value.trim() !== "" && value !== "Not found";
+
+    const applyLateFields = () => {
+      const data = adapter.scrape();
+      if (!data) return false;
+      const contact = normalizeWhitespace(data.contact);
+      const phone = normalizeWhitespace(data.phone);
+      const listingDate = normalizeWhitespace(data.listingDate);
+      render.updateElement("prop-contact", contact);
+      render.updateElement("prop-phone", phone);
+      render.updateElement("prop-dom", calculateDOM(listingDate));
+      return isPresent(contact) && isPresent(phone) && isPresent(listingDate);
+    };
+
+    if (applyLateFields()) return;
+
+    let remaining = Math.ceil(LATE_FIELD_TIMEOUT / LATE_FIELD_POLL_INTERVAL);
+    const tick = () => {
+      if (guard.isStale()) return;
+      if (applyLateFields() || remaining-- <= 0) return;
+      setTimeout(tick, LATE_FIELD_POLL_INTERVAL);
+    };
+    setTimeout(tick, LATE_FIELD_POLL_INTERVAL);
   }
 
   async function updateFooterData() {
@@ -105,6 +150,10 @@ export function createPipeline({ adapter, config, ctx, exportOps, finance, rende
     render.updateCapRateLabel();
     render.syncUnitsFieldForType(state.currentPropertyType, data.bedroomCount);
     setupClickableElements(data);
+
+    // Fields some sites render after first paint (agent contact/phone, listing date) start as
+    // "Not found" above; fill them in progressively as they arrive without blocking what follows.
+    watchLateFields(guard);
 
     const calculationCapRate = state.isUsingEstimatedCapRate ? `${state.currentEstimatedCapRate}%` : data.capRate;
     const financials = await calculateFinancials(ctx, data.price, calculationCapRate, state.currentPropertyType, data.name);
