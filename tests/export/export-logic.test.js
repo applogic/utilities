@@ -33,11 +33,13 @@ describe("createExportObjectCore", () => {
     expect(result.capRate).toBe(0.07);
   });
 
-  test("reverses an applied discount to recover the original asking price", () => {
-    // WHY: the panel shows the discounted price, but the dashboard wants the true ask.
-    // At 15% off, a displayed $850,000 must export as the original $1,000,000.
+  test("exports the scraped asking price unchanged and carries the discount separately", () => {
+    // WHY: data.price is the raw scraped ASKING price; the discount is applied only at display
+    // time, never folded into the scrape. So a 15% discount must NOT alter the exported asking —
+    // the dashboard derives offered = asking x (1 - discount) downstream. Dividing here would
+    // inflate the ask on every import (asking shown as $1,176,470 instead of the real $1,000,000).
     const result = createExportObjectCore(
-      { ...baseListing, price: "$850,000" },
+      { ...baseListing, price: "$1,000,000" },
       { currentPriceDiscount: 15 }
     );
     expect(result.price).toBe(1000000);

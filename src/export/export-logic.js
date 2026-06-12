@@ -75,19 +75,14 @@ export function createExportObjectCore(data, options = {}) {
     exportData.dateListed = data.listingDate;
   }
 
-  // 6. Price - calculate original price if discount applied
+  // 6. Price - the SCRAPED asking price. data.price is the raw page price (the true ask); the
+  // discount is a display-only concept applied at render (getCurrentPrice), never folded into the
+  // scrape. So export the asking as-is and carry the discount separately (step 11); the dashboard
+  // derives offered = asking x (1 - discount). Dividing here would inflate the ask on every import.
   if (data.price && data.price !== "Loading..." && data.price !== "Not found") {
     const priceMatch = data.price.match(/[\d,]+/);
     if (priceMatch) {
-      const displayedPrice = parseFloat(priceMatch[0].replace(/,/g, ""));
-
-      if (currentPriceDiscount > 0) {
-        const discountDecimal = currentPriceDiscount / 100;
-        const originalPrice = displayedPrice / (1 - discountDecimal);
-        exportData.price = Math.round(originalPrice);
-      } else {
-        exportData.price = displayedPrice;
-      }
+      exportData.price = Math.round(parseFloat(priceMatch[0].replace(/,/g, "")));
     }
   }
 
