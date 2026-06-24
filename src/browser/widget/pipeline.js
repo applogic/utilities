@@ -105,9 +105,25 @@ export function createPipeline({ adapter, config, ctx, exportOps, finance, rende
 
     if (applyLateFields()) return;
 
+    // A reveal's trigger (e.g. LoopNet's "Call" button) can render AFTER the one-shot runReveals
+    // in updateFooterData fired — the broker CTA paints a beat after price/title — so the gated
+    // field (phone) is never clicked into the DOM and the scrape poll above finds nothing to fill.
+    // Re-run the idempotent reveals alongside the poll: runReveals no-ops once its waitFor target
+    // is present, so this clicks each trigger at most once. The overlap guard prevents a second
+    // click during the window between the first click and the revealed content appearing.
+    let revealing = false;
+    const retryReveals = () => {
+      if (revealing || !config.reveals?.length) return;
+      revealing = true;
+      runReveals(config.reveals).finally(() => {
+        revealing = false;
+      });
+    };
+
     let remaining = Math.ceil(LATE_FIELD_TIMEOUT / LATE_FIELD_POLL_INTERVAL);
     const tick = () => {
       if (guard.isStale()) return;
+      retryReveals();
       if (applyLateFields() || remaining-- <= 0) return;
       setTimeout(tick, LATE_FIELD_POLL_INTERVAL);
     };

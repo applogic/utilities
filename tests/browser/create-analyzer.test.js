@@ -314,6 +314,7 @@ describe("createAnalyzer — click-to-reveal before scrape (config.reveals)", ()
     vi.useRealTimers();
     document.getElementById("ln-footer")?.remove();
     document.getElementById("reveal-call")?.remove();
+    document.getElementById("revealed-tel")?.remove();
   });
 
   test("the engine reveals gated data, then scrape() reads it into the panel", async () => {
@@ -364,6 +365,65 @@ describe("createAnalyzer — click-to-reveal before scrape (config.reveals)", ()
     analyzer.runPipeline();
     await vi.runAllTimersAsync();
 
+    expect(document.getElementById("revealed-tel")).not.toBeNull();
+    expect(document.getElementById("prop-phone").textContent).toBe("5105022288");
+  });
+
+  test("re-reveals when the trigger renders after first paint (late broker CTA)", async () => {
+    // WHY this is the LoopNet phone regression: the broker "Call" button paints a beat AFTER
+    // price/title, so the one-shot runReveals in updateFooterData finds no trigger and never clicks
+    // — phone stays "Not found" forever even though clicking would inject the tel: link. The fix is
+    // that the late-field poll re-runs the idempotent reveals, so once the Call button arrives it
+    // gets clicked and the phone fills in. Without the re-reveal this asserts the broken behavior.
+    vi.useFakeTimers();
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ equity: 60 }) }));
+
+    const scrape = () => {
+      const tel = document.getElementById("revealed-tel");
+      return {
+        bedroomCount: null,
+        capRate: "6.5%",
+        contact: "Jane Broker",
+        listingDate: "2026-05-01",
+        name: "820 Island Dr",
+        phone: tel ? tel.getAttribute("href").replace("tel:", "") : "Not found",
+        price: "$1,299,000",
+        unitCount: 4,
+      };
+    };
+
+    const analyzer = createAnalyzer({
+      config: {
+        cssFiles: [],
+        defaultPropertyType: "multifamily",
+        reveals: [{ name: "phone", trigger: ".show-phone", waitFor: "#revealed-tel", timeout: 1500 }],
+      },
+      getListingId: () => "820-island-dr",
+      matches: () => true,
+      scrape,
+    });
+    analyzer.runPipeline();
+
+    // First paint: the Call button is NOT in the DOM yet, so the one-shot reveal had nothing to
+    // click and phone is "Not found".
+    await vi.advanceTimersByTimeAsync(200);
+    expect(document.getElementById("prop-phone").textContent).toBe("Not found");
+
+    // The broker CTA paints a beat later; clicking it reveals the tel: link.
+    const call = document.createElement("button");
+    call.id = "reveal-call";
+    call.className = "show-phone";
+    call.textContent = "Call";
+    call.addEventListener("click", () => {
+      const a = document.createElement("a");
+      a.href = "tel:5105022288";
+      a.id = "revealed-tel";
+      document.body.appendChild(a);
+    });
+    document.body.appendChild(call);
+
+    // The late-field poll re-runs the reveal, clicks the now-present Call button, and fills phone.
+    await vi.runAllTimersAsync();
     expect(document.getElementById("revealed-tel")).not.toBeNull();
     expect(document.getElementById("prop-phone").textContent).toBe("5105022288");
   });
