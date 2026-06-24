@@ -49,9 +49,62 @@ export function setupPriceClickHandler(priceElement, priceLabelElement, callback
   const { state, updateState } = callbacks;
   const metric = priceElement.closest('.metric');
 
+  // Manual price entry — only when the page exposed no usable price (priceWasDefaulted or a
+  // non-numeric display like "No price"). Committing a positive number sets it as the listing
+  // price and re-flows everything, clearing the all-N/A state a missing price causes. When a
+  // real price exists, the click keeps cycling the discount (below).
+  function commitPrice(raw) {
+    const match = String(raw).match(/[\d,.]+/);
+    const value = match ? parseFloat(match[0].replace(/,/g, "")) : NaN;
+    if (Number.isFinite(value) && value > 0) {
+      const formatted = `$${Math.round(value).toLocaleString()}`;
+      updateState({ baseNOI: null, currentPriceDiscount: 0, originalPrice: formatted, priceWasDefaulted: false });
+      priceElement.textContent = formatted;
+    }
+    callbacks.updatePriceLabel();
+    callbacks.recalculateFinancials();
+    updateDiscountButtonText(state);
+  }
+
+  function openPriceInput() {
+    if (priceElement.querySelector("input")) return;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = "";
+    input.placeholder = "price $";
+    input.className = "price-input";
+    input.style.width = "110px";
+    priceElement.textContent = "";
+    priceElement.appendChild(input);
+    input.focus();
+
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      const value = input.value;
+      input.remove();
+      if (save) commitPrice(value);
+      else callbacks.recalculateFinancials();
+    };
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); finish(true); }
+      else if (ev.key === "Escape") { ev.preventDefault(); finish(false); }
+    });
+    input.addEventListener("blur", () => finish(true));
+  }
+
   priceElement.addEventListener("click", function(e) {
     e.preventDefault();
     e.stopPropagation();
+
+    if (priceElement.querySelector("input")) return;
+
+    const priceMissing = state.priceWasDefaulted || !/\d/.test(priceElement.textContent || "");
+    if (priceMissing) {
+      openPriceInput();
+      return;
+    }
 
     let newDiscount = Math.floor(state.currentPriceDiscount / 10) * 10 + 10;
     if (newDiscount > 50) {
@@ -100,48 +153,99 @@ export function setupPriceClickHandler(priceElement, priceLabelElement, callback
   priceLabelElement.style.cursor = "pointer";
 }
 
+// Manual cap-rate entry on the cap cell — available for EVERY listing (reported, estimated, or
+// none). Clicking the cap value swaps in an inline input; committing a positive number routes
+// through the engine's capManuallySet override (NOI = original price x cap for every type), so
+// any change re-flows all calculations. baseNOI is cleared so the override recomputes, and
+// isUsingEstimatedCapRate is set so the calc reads the typed value from state rather than the
+// DOM. Clicking the label resets to the page's reported cap when there was one, else to the
+// 5% estimate.
 export function setupCapRateClickHandler(capElement, capLabelElement, callbacks) {
   if (!capElement || !capLabelElement) return;
-
-  const { state, updateState } = callbacks;
-  if (!state.isUsingEstimatedCapRate) return;
 
   // Prevent duplicate attachment
   if (capElement.dataset.handlerAttached === 'true') return;
   capElement.dataset.handlerAttached = 'true';
 
+  const { state, updateState } = callbacks;
   const metric = capElement.closest('.metric');
+
+  function commit(raw) {
+    const match = String(raw).match(/[\d.]+/);
+    const value = match ? parseFloat(match[0]) : NaN;
+    if (Number.isFinite(value) && value > 0) {
+      updateState({
+        baseNOI: null,
+        capManuallySet: true,
+        currentEstimatedCapRate: value,
+        isUsingEstimatedCapRate: true,
+      });
+    }
+    callbacks.recalculateFinancials();
+    if (metric) {
+      const tooltipContent = generateCapRateTooltipHTML(state.isUsingEstimatedCapRate);
+      if (tooltipContent) updateTooltipContent(metric, tooltipContent);
+    }
+  }
 
   capElement.addEventListener("click", function(e) {
     e.preventDefault();
     e.stopPropagation();
 
-    let newCapRate = state.currentEstimatedCapRate + 1;
-    if (newCapRate > 20) {
-      newCapRate = 5;
-    }
+    if (capElement.querySelector("input")) return;
 
-    updateState({ currentEstimatedCapRate: newCapRate, capManuallySet: true });
+    const match = (capElement.textContent || "").match(/[\d.]+/);
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = match ? match[0] : "";
+    input.placeholder = "cap %";
+    input.className = "cap-input";
+    input.style.width = "56px";
+    capElement.textContent = "";
+    capElement.appendChild(input);
+    input.focus();
+    input.select();
 
-    capElement.textContent = `${newCapRate}%*`;
-    callbacks.recalculateFinancials();
-
-    if (metric) {
-      const tooltipContent = generateCapRateTooltipHTML(state.isUsingEstimatedCapRate);
-      if (tooltipContent) {
-        updateTooltipContent(metric, tooltipContent);
-      }
-    }
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      const value = input.value;
+      // Remove the input before recalc so updateActiveCapDisplay can repaint the cap cell
+      // (prop-cap is painted only there, never by applyFinancials).
+      input.remove();
+      if (save) commit(value);
+      else callbacks.recalculateFinancials();
+    };
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); finish(true); }
+      else if (ev.key === "Escape") { ev.preventDefault(); finish(false); }
+    });
+    input.addEventListener("blur", () => finish(true));
   });
 
   capLabelElement.addEventListener("click", function(e) {
     e.preventDefault();
     e.stopPropagation();
 
-    const originalCapRate = state.originalEstimatedCapRate || FINANCIAL_CONSTANTS.DEFAULT_CAP_RATE;
-    updateState({ currentEstimatedCapRate: originalCapRate, capManuallySet: false, baseNOI: null });
+    const reportedMatch = state.originalCapRate && !state.originalCapRate.includes("*")
+      ? state.originalCapRate.match(/[\d.]+/)
+      : null;
 
-    capElement.textContent = `${originalCapRate}%*`;
+    if (reportedMatch) {
+      // Restore the page's reported cap: write it to the cell so the non-estimated calc path
+      // (which reads the cap cell) recomputes against it, not the prior override.
+      capElement.textContent = `${parseFloat(reportedMatch[0])}%`;
+      updateState({ baseNOI: null, capManuallySet: false, isUsingEstimatedCapRate: false });
+    } else {
+      const originalCapRate = state.originalEstimatedCapRate || FINANCIAL_CONSTANTS.DEFAULT_CAP_RATE * 100;
+      updateState({
+        baseNOI: null,
+        capManuallySet: false,
+        currentEstimatedCapRate: originalCapRate,
+        isUsingEstimatedCapRate: true,
+      });
+    }
     callbacks.recalculateFinancials();
 
     if (metric) {

@@ -99,8 +99,11 @@ export function createFinance({ ctx, adapter, render }) {
     if (state.isUsingEstimatedCapRate) {
       capRateText = `${state.currentEstimatedCapRate}%*`;
     } else {
+      // Use the scraped reported cap (authoritative), not the painted cap cell — the cell shows
+      // the active cap (NOI/price), which is "N/A" when price is missing and would break the
+      // recompute when a price is later entered manually.
       const capElement = document.getElementById("prop-cap");
-      capRateText = capElement ? capElement.textContent : "8%";
+      capRateText = state.originalCapRate || (capElement ? capElement.textContent : "8%");
     }
 
     if (state.currentPropertyType === "str") updateState({ cachedSTRData: null });

@@ -148,6 +148,41 @@ describe("createAnalyzer — full pipeline render (jsdom)", () => {
     expect(document.getElementById("prop-cap").textContent).toBe("6.5%");
     expect(document.getElementById("prop-equity").textContent).toBe("55%");
   });
+
+  test("typing a price when the page had none clears the all-N/A state", async () => {
+    // WHY: a missing price is the dominant cause of the panel painting N/A everywhere. Entering
+    // a price manually must set it as the listing price and re-flow every metric.
+    vi.useFakeTimers();
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ address: "820 Island Dr", currentMortgages: [], estimatedMortgageBalance: 0 }),
+    }));
+
+    const analyzer = createAnalyzer(
+      makeAdapter({ listing: makeListing({ price: "Not found", priceWasDefaulted: true }) })
+    );
+    analyzer.runPipeline();
+    await vi.runAllTimersAsync();
+
+    // No usable price -> every financial metric is N/A.
+    expect(document.getElementById("prop-noi").textContent).toBe("N/A");
+
+    const priceEl = document.getElementById("prop-price");
+    priceEl.click();
+    const input = priceEl.querySelector("input");
+    expect(input).not.toBeNull();
+    input.value = "1,000,000";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    await vi.runAllTimersAsync();
+
+    expect(analyzer.ctx.state.priceWasDefaulted).toBe(false);
+    expect(analyzer.ctx.state.originalPrice).toBe("$1,000,000");
+    // Reported cap 6.5% + the freshly entered price -> MF NOI = 1,000,000 x 0.065 = 65,000.
+    // (Proves a reported-cap listing with no price is rescued by entering the price.)
+    const noi = document.getElementById("prop-noi").textContent;
+    expect(noi).not.toBe("N/A");
+    expect(noi.startsWith("$")).toBe(true);
+  });
 });
 
 describe("createAnalyzer — cap display: active rate + reported-on-hover (T8)", () => {
@@ -203,7 +238,7 @@ describe("createAnalyzer — cap display: active rate + reported-on-hover (T8)",
     expect(capTooltipText()).toContain("4.86%");
   });
 
-  test("no reported cap anywhere: hover shows N/A (plus the click-to-cycle hint)", async () => {
+  test("no reported cap anywhere: hover shows N/A (plus the click-to-enter hint)", async () => {
     // WHY: a "Not found" cap means there is no reported value — the hover must say N/A rather
     // than echo the engine's 5% estimate as if the listing reported it.
     await render(makeAdapter({ listing: makeListing({ capRate: "Not found" }) }));
@@ -212,11 +247,11 @@ describe("createAnalyzer — cap display: active rate + reported-on-hover (T8)",
     expect(capTooltipText()).toContain("Click the cap rate");
   });
 
-  test("clicking an estimated cap overrides NOI so the active cap rises 1% (STR)", async () => {
-    // WHY: clicking the cap is a manual NOI override for EVERY type. STR NOI normally ignores the
-    // cap (5.5% estimate -> active 5.5%); without the override the click would do nothing. With
-    // it, NOI = price x cap (5% -> 6%): 1,299,000 x 0.06 = 77,940 -> active 6.0%. This is the
-    // behavior the user asked for.
+  test("typing a cap value overrides NOI so the active cap reflects the entry (STR)", async () => {
+    // WHY: clicking the cap opens an inline input; committing a value is a manual NOI override
+    // for EVERY type. STR NOI normally ignores the cap (5.5% estimate -> active 5.5%); with the
+    // override, NOI = price x typed cap (6%): 1,299,000 x 0.06 = 77,940 -> active 6.0%. This is
+    // the manual-entry behavior the user asked for.
     const analyzer = await render(
       makeAdapter({
         config: { cssFiles: [], defaultPropertyType: "str" },
@@ -225,11 +260,41 @@ describe("createAnalyzer — cap display: active rate + reported-on-hover (T8)",
     );
     expect(document.getElementById("prop-cap").textContent).toBe("5.5%");
 
-    document.getElementById("prop-cap").click();
+    const capEl = document.getElementById("prop-cap");
+    capEl.click();
+    const input = capEl.querySelector("input");
+    expect(input).not.toBeNull();
+    input.value = "6";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     await vi.runAllTimersAsync();
 
     expect(analyzer.ctx.state.capManuallySet).toBe(true);
+    expect(analyzer.ctx.state.currentEstimatedCapRate).toBe(6);
     expect(document.getElementById("prop-cap").textContent).toBe("6.0%");
+  });
+
+  test("typing a cap value on a listing that reported a real cap (MF override)", async () => {
+    // WHY: the cap is now editable for EVERY listing, not just estimated ones. A reported 6.5%
+    // cap can be overridden to 8%: MF NOI = 1,299,000 x 0.08 = 103,920 -> active 8.0%.
+    const analyzer = await render(makeAdapter({ listing: makeListing({ capRate: "6.5%" }) }));
+    expect(document.getElementById("prop-cap").textContent).toBe("6.5%");
+
+    const capEl = document.getElementById("prop-cap");
+    capEl.click();
+    const input = capEl.querySelector("input");
+    expect(input).not.toBeNull();
+    input.value = "8";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    await vi.runAllTimersAsync();
+
+    expect(analyzer.ctx.state.capManuallySet).toBe(true);
+    expect(document.getElementById("prop-cap").textContent).toBe("8.0%");
+
+    // Clicking the label restores the page's reported cap (6.5%).
+    document.querySelector("#prop-cap").closest(".metric").querySelector(".metric-label").click();
+    await vi.runAllTimersAsync();
+    expect(analyzer.ctx.state.capManuallySet).toBe(false);
+    expect(document.getElementById("prop-cap").textContent).toBe("6.5%");
   });
 
   test("export carries the computed NOI (baseNOI) while capRate stays the reported value (T2)", async () => {

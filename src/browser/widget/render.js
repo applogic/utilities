@@ -73,6 +73,8 @@ export function createRender({ ctx }) {
   function updateActiveCapDisplay() {
     const capElement = document.getElementById("prop-cap");
     if (!capElement) return;
+    // Don't clobber an in-progress manual cap edit (the inline input lives in this cell).
+    if (capElement.querySelector("input")) return;
 
     const priceText = getCurrentPrice() || document.getElementById("prop-price")?.textContent || "";
     const price = parsePriceNumber(priceText);
@@ -80,10 +82,8 @@ export function createRender({ ctx }) {
 
     const reported = parseReportedCap(state.originalCapRate, state.isUsingEstimatedCapRate);
     const reportedLine = `<strong>Reported cap rate:</strong> ${reported != null ? `${reported}%` : "N/A"}`;
-    const cycleHint = state.isUsingEstimatedCapRate
-      ? "<hr><em>Click the cap rate to increase by 1%; click the label to reset</em>"
-      : "";
-    const tooltipContent = `${reportedLine}${cycleHint}`;
+    const editHint = "<hr><em>Click the cap rate to enter a value; click the label to reset</em>";
+    const tooltipContent = `${reportedLine}${editHint}`;
 
     const metric = capElement.closest(".metric");
     if (metric) {

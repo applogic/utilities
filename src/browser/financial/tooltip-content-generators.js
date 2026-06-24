@@ -23,7 +23,7 @@ export function generateCapRateTooltipHTML(isUsingEstimatedCapRate) {
   if (!isUsingEstimatedCapRate) return null;
 
   return `
-    <strong>Click the cap rate to increase by 1%</strong>
+    <strong>Click the cap rate to enter a value</strong>
     <hr>
     <em>Click the label to reset</em>
   `;
