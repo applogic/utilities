@@ -8,12 +8,23 @@
 //   - estimatedMortgageBalance: number (debt owing) or null when the service has no figure
 //   - currentMortgages: array of lien objects (amount, position, lenderName, loanType, ...)
 //   - source: "api" when a numeric balance came back, "estimated" when it did not
-// Throws on a network / non-OK HTTP error so the caller can treat it as the estimated case.
+// A 404 means the service definitively has no debt record for the address — returned as the
+// estimated case (not thrown). Throws on a genuine network / non-OK HTTP error (e.g. 500) so
+// the caller can log it and still fall back to the estimated case.
 export async function fetchDebt(address, { baseUrl = "https://api.archerjessop.com" } = {}) {
   const response = await fetch(
     `${baseUrl}/debt?address=${encodeURIComponent(address)}`,
     { method: "GET", headers: { "Content-Type": "application/json" } }
   );
+
+  if (response.status === 404) {
+    return {
+      address,
+      currentMortgages: [],
+      estimatedMortgageBalance: null,
+      source: "estimated",
+    };
+  }
 
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);

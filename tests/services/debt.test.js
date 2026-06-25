@@ -44,6 +44,18 @@ describe("fetchDebt", () => {
     await expect(fetchDebt("z")).rejects.toThrow("HTTP error! status: 502");
   });
 
+  test("treats 404 (no debt record) as the estimated case, not an error", async () => {
+    // WHY: a 404 means the service definitively has no PrimeTracers match (e.g. a portfolio
+    // name). That is a normal "no figure" outcome, so the fetcher must resolve to the estimated
+    // shape — never throw — so loadDebt does not log a spurious error for a routine no-data hit.
+    mockFetch(async () => ({ ok: false, status: 404, json: async () => ({ error: "No debt data found" }) }));
+    const result = await fetchDebt("Hoffman Street Portfolio, Bronx, NY");
+    expect(result.estimatedMortgageBalance).toBeNull();
+    expect(result.currentMortgages).toEqual([]);
+    expect(result.source).toBe("estimated");
+    expect(result.address).toBe("Hoffman Street Portfolio, Bronx, NY");
+  });
+
   test("hits the /debt endpoint with the encoded address and honors baseUrl", async () => {
     const spy = vi.fn(async () => ({ ok: true, status: 200, json: async () => BLUCHER }));
     mockFetch(spy);

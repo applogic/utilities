@@ -1,24 +1,31 @@
 export function extractPhoneNumber() {
-  const phoneElement = document.querySelector(".phone-number") ||
-                      document.querySelector("a[href^='tel:']") ||
-                      document.querySelector(".number") ||
-                      document.querySelector("[class*='phone']");
+  const PHONE_RE = /(\+?1?\s*\(?[0-9]{3}\)?[\s.-]*[0-9]{3}[\s.-]*[0-9]{4})/;
 
-  if (phoneElement) {
-    if (phoneElement.textContent && phoneElement.textContent.trim() !== "Call") {
-      return phoneElement.textContent.trim();
-    } else if (phoneElement.href) {
-      // Extract from tel: link
-      const telMatch = phoneElement.href.match(/tel:(.+)/);
-      if (telMatch) {
-        return telMatch[1];
-      }
+  // A tel: link is unambiguous — prefer it. Its href holds the real number even when the
+  // visible text is a label ("Call") or, on LoopNet, a lead-form validation message.
+  const telLink = document.querySelector("a[href^='tel:']");
+  if (telLink && telLink.href) {
+    const num = decodeURIComponent(telLink.href.replace(/^tel:/, "")).trim();
+    if (PHONE_RE.test(num)) return num;
+  }
+
+  // Other phone-ish elements, but accept their TEXT only if it actually looks like a phone —
+  // guards against lead-capture form fields (class*="phone") whose text is a label/validation
+  // message ("Phone* Valid phone number is required"), not a number.
+  for (const sel of [".phone-number", ".number", "[class*='phone']"]) {
+    const el = document.querySelector(sel);
+    if (!el) continue;
+    const m = (el.textContent || "").match(PHONE_RE);
+    if (m) return m[1].trim();
+    if (el.href) {
+      const num = decodeURIComponent(el.href.replace(/^tel:/, "")).trim();
+      if (PHONE_RE.test(num)) return num;
     }
   }
 
-  // Fallback to text search with multiple patterns
+  // Fallback to a body-text scan.
   const pageText = document.body ? document.body.textContent || "" : "";
-  const phoneMatch = pageText.match(/(\+?1?\s*\(?[0-9]{3}\)?[\s.-]*[0-9]{3}[\s.-]*[0-9]{4})/);
+  const phoneMatch = pageText.match(PHONE_RE);
   if (phoneMatch) {
     return phoneMatch[1].trim();
   }
