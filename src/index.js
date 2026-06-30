@@ -25,6 +25,9 @@ export {
   safePercentage,
 } from "./financial/calculations.js";
 
+// Equity Carry scoring engine (pure; scores scraped listings into deal pools)
+export { EQUITY_CARRY_TIERS, calculateEquityCarryScore } from "./financial/equity-carry.js";
+
 // Agnostic debt service (pure IO; Node + browser)
 export { fetchDebt } from "./services/debt.js";
 
