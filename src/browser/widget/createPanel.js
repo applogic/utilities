@@ -187,6 +187,7 @@ function createPanelElements(defaultPropertyType, callbacks) {
       </div>
       <div class="footer-controls">
         <div class="footer-controls-col">
+          <span id="ln-red-reasons" class="red-reasons-pill" style="display:none"></span>
           <div class="units-input-row">
             <input type="number" id="ln-units-input" class="units-input" min="1" max="999" value="4">
             <span class="units-inline-label">units</span>

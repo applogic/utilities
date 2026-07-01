@@ -126,6 +126,7 @@ export async function calculateFinancials(ctx, priceText, capRateText, propertyT
       cashFlow: formatCurrency(cashFlow, true),
       assignment: formatCurrency(assignment),
       rawCashFlow: cashFlow,
+      rawDown: down,
       rawPrice: askingPrice,
       rawNOI: noi,
     };

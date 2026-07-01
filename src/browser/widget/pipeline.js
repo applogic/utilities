@@ -198,7 +198,9 @@ export function createPipeline({ adapter, config, ctx, exportOps, finance, rende
 
     await services.loadDebt(data.name, guard);
     if (guard.isStale()) return;
-    render.updateEquityDisplay();
+    // Recompute (not just repaint equity) so the equity-aware red state picks up the newly
+    // loaded debt; recalculateFinancials calls updateEquityDisplay internally.
+    await finance.recalculateFinancials();
   }
 
   // One running pipeline at a time. Re-runnable so the SPA watcher can rebuild per listing;

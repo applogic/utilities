@@ -253,6 +253,7 @@ export function createRender({ ctx }) {
 
   function applyFinancials(financials) {
     let isCashFlowNegative = false;
+    let insufficientEquity = false;
     if (financials) {
       const elements = {
         "prop-noi": financials.noi,
@@ -267,6 +268,12 @@ export function createRender({ ctx }) {
         "prop-cashflow": financials.cashFlow,
       };
       isCashFlowNegative = financials.rawCashFlow < 0;
+      // Equity-aware: seller financing requires the seller to clear their existing debt at
+      // close from the buyer's down payment, so a down payment that can't cover known debt is
+      // an infeasible deal — same red treatment as negative cash flow (mirrors the dashboard).
+      // Unknown debt (null) is assumed 100% equity and never flags.
+      const debt = state.cachedDebtBalance;
+      insufficientEquity = Number.isFinite(debt) && debt > financials.rawDown;
       for (const [id, value] of Object.entries(elements)) updateElement(id, value);
       setTimeout(() => {
         updateDownHoverTooltip();
@@ -278,8 +285,19 @@ export function createRender({ ctx }) {
 
     updatePercentageLabels();
     updateStrAffordances();
+
+    const isRed = isCashFlowNegative || insufficientEquity;
     const footer = document.getElementById("ln-footer");
-    if (footer) footer.classList.toggle("negative", isCashFlowNegative);
+    if (footer) footer.classList.toggle("negative", isRed);
+
+    const reasons = [];
+    if (isCashFlowNegative) reasons.push("CF");
+    if (insufficientEquity) reasons.push("IE");
+    const pill = document.getElementById("ln-red-reasons");
+    if (pill) {
+      pill.textContent = reasons.join(" · ");
+      pill.style.display = reasons.length ? "" : "none";
+    }
   }
 
   return {
