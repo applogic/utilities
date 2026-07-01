@@ -291,8 +291,8 @@ export function createRender({ ctx }) {
     if (footer) footer.classList.toggle("negative", isRed);
 
     const reasons = [];
-    if (isCashFlowNegative) reasons.push("CF");
-    if (insufficientEquity) reasons.push("IE");
+    if (isCashFlowNegative) reasons.push("Cash Flow");
+    if (insufficientEquity) reasons.push("Equity");
     const pill = document.getElementById("ln-red-reasons");
     if (pill) {
       pill.textContent = reasons.join(" · ");

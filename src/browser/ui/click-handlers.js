@@ -478,3 +478,30 @@ export function setupDownPaymentClickHandler(downElement, downLabelElement, call
   downElement.style.cursor = "pointer";
   downLabelElement.style.cursor = "pointer";
 }
+
+// Clicking the Equity cell resets the stack to the 60% down tier (DSCR 70 / seller carry 40) —
+// the highest down payment, the fastest way to cure an "Equity" red (down payment must cover the
+// seller's existing debt). Matches the 60/70/40 wrap in the down-payment handler above.
+export function setupEquityResetHandler(equityElement, callbacks) {
+  if (!equityElement) return;
+  if (equityElement.dataset.handlerAttached === "true") return;
+  equityElement.dataset.handlerAttached = "true";
+
+  const { updateState } = callbacks;
+
+  equityElement.addEventListener("click", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    updateState({
+      currentDSCRPercent: 70,
+      currentDownPaymentPercent: 60,
+      currentSellerFiPercent: 40,
+    });
+
+    callbacks.updatePercentageLabels();
+    callbacks.recalculateFinancials();
+  });
+
+  equityElement.style.cursor = "pointer";
+}

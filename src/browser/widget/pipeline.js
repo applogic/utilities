@@ -12,6 +12,7 @@ import {
   setupCapRateClickHandler,
   setupDiscountButtonHandler,
   setupDownPaymentClickHandler,
+  setupEquityResetHandler,
   setupNoiClickHandler,
   setupPriceClickHandler,
 } from "../ui/click-handlers.js";
@@ -71,6 +72,8 @@ export function createPipeline({ adapter, config, ctx, exportOps, finance, rende
 
     const downElement = document.getElementById("prop-down");
     setupDownPaymentClickHandler(downElement, downElement?.closest(".metric")?.querySelector(".metric-label"), callbacks);
+
+    setupEquityResetHandler(document.getElementById("prop-equity"), callbacks);
 
     const noiElement = document.getElementById("prop-noi");
     setupNoiClickHandler(noiElement, noiElement?.closest(".metric")?.querySelector(".metric-label"), callbacks);
