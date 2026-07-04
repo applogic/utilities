@@ -1,7 +1,7 @@
 // src/financial/equity-carry.js
 
 import { DEFAULT_CAP_RATE, INTEREST_RATE_TIERS, SELLER_FI_AMORTIZATION, SELLER_FI_INTEREST_RATE, determineInterestRateType } from "../config/financial.js";
-import { calculateAssignmentFee, calculatePMT, resolveListingFinancials } from "./calculations.js";
+import { calculateAssignmentFee, calculateCOCRAtPercent, calculatePMT, calculatePriceForCOCR, resolveListingFinancials } from "./calculations.js";
 
 /**
  * Equity Carry financing tiers (constant 110% leverage: DSCR % + seller carry % = 110).
@@ -80,12 +80,16 @@ function sweepTiers(noi, basis, dscrRate, dscrAmortization, estimatedDebt) {
  * @param {number|string} input.price - Asking price (positive); null/0 returns null
  * @param {string} [input.propertyType] - DB property type (mfr/str/assisted/other)
  * @param {number|string|null} [input.units] - Unit count (selects residential vs commercial DSCR tier)
- * @returns {{assignment:number, cap_source:string, cash_flow:(number|null), deal_pool:string, downpayment_percent:number, equity_tier:(object|null), offer_price:number, raw_yield:number, yield_band:string}|null}
- *   `cap_source` is "reported" when a usable cap was supplied, "estimate" when the row was
- *   scored on DEFAULT_CAP_RATE because none was — the UI flags "estimate" rows as
- *   needs-confirmation and offers a manual cap-rate input that re-scores the row. Most
- *   meaningful for cap-driven types (mfr/other); STR/assisted derive NOI from other models.
- *   Null when price is not a positive number (caller should skip + log; the SQL gate excludes these).
+ * @returns {{assignment:number, cap_source:string, cash_flow:(number|null), cocr15_discount:(number|null), cocr15_price:(number|null), cocr30:(number|null), deal_pool:string, downpayment_percent:number, equity_tier:(object|null), offer_price:number, raw_yield:number, yield_band:string}|null}
+ *   `cap_source` is "reported" when a usable (positive) cap was supplied, "estimate" when the
+ *   row was scored on DEFAULT_CAP_RATE because none was reported (or a non-positive cap was) —
+ *   the UI flags "estimate" rows as needs-confirmation and offers a manual cap-rate input that
+ *   re-scores the row. Most meaningful for cap-driven types (mfr/other); STR/assisted derive NOI
+ *   from other models. `cocr15_price` is the standard-investor (30% down / 70% DSCR) price that
+ *   yields a 15% COCR on the row's NOI; `cocr15_discount` is that price as a fraction of asking
+ *   ((target - price)/price, a decimal); `cocr30` is the actual COCR percent at asking with 30%
+ *   down. All three are null when NOI <= 0. Null (whole result) when price is not a positive
+ *   number (caller should skip + log; the SQL gate excludes these).
  */
 export function calculateEquityCarryScore({
   bedroomCount = null,
@@ -98,7 +102,7 @@ export function calculateEquityCarryScore({
   if (!Number.isFinite(priceNum) || priceNum <= 0) return null;
 
   const capPercent = capRate === null || capRate === undefined || capRate === "" ? NaN : Number(capRate);
-  const reportedCapRate = Number.isFinite(capPercent) ? capPercent / 100 : null;
+  const reportedCapRate = Number.isFinite(capPercent) && capPercent > 0 ? capPercent / 100 : null;
 
   const unitsNum = Number(units);
   const rateType = determineInterestRateType(propertyType, Number.isFinite(unitsNum) ? unitsNum : undefined);
@@ -146,10 +150,26 @@ export function calculateEquityCarryScore({
     yieldBand = "low";
   }
 
+  let cocr15Price = null;
+  let cocr15Discount = null;
+  let cocr30 = null;
+  if (noi > 0) {
+    const targetPrice = calculatePriceForCOCR(noi, 0.15, { dscrRate, dscrTerm: dscrAmortization });
+    if (Number.isFinite(targetPrice) && targetPrice > 0) {
+      cocr15Price = targetPrice;
+      cocr15Discount = (targetPrice - priceNum) / priceNum;
+    }
+    const cocrAtThirty = calculateCOCRAtPercent(priceNum, noi, 30, { dscrRate, dscrTerm: dscrAmortization });
+    if (Number.isFinite(cocrAtThirty)) cocr30 = cocrAtThirty;
+  }
+
   return {
     assignment: calculateAssignmentFee(offerPrice),
     cap_source: reportedCapRate === null ? "estimate" : "reported",
     cash_flow: winner ? winner.cashFlow : null,
+    cocr15_discount: cocr15Discount,
+    cocr15_price: cocr15Price,
+    cocr30,
     deal_pool: dealPool,
     downpayment_percent: winner ? winner.tier.downPercent : -1,
     equity_tier: winner ? { ...winner.tier } : null,

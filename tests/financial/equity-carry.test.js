@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { EQUITY_CARRY_TIERS, calculateEquityCarryScore } from "../../src/financial/equity-carry.js";
+import { calculateCOCRAtPercent } from "../../src/financial/calculations.js";
 
 // The scorer routes scraped_listings into deal pools via the Equity Carry Method (constant
 // 110% leverage across five down-payment tiers). These fixtures are fed in the EXACT shape
@@ -92,6 +93,44 @@ describe("calculateEquityCarryScore", () => {
     // identical, only the provenance differs (which is exactly what the UI badge keys off).
     expect(r.deal_pool).toBe(calculateEquityCarryScore({ capRate: "5.00", price: "1000000", propertyType: "mfr", units: "4" }).deal_pool);
     expect(calculateEquityCarryScore({ capRate: "5.00", price: "1000000", propertyType: "mfr", units: "4" }).cap_source).toBe("reported");
+  });
+
+  test("cap rate <= 0 is treated as unreported (estimate), never a real 0% that scores dead", () => {
+    // WHY: a scraped/typo "0" cap must not drive NOI to price*0 = 0 (which scores dead AND hides
+    // the row from the 'est' badge). <= 0 coerces to the 5% estimate, exactly like a null cap ->
+    // same discount@30 routing as the null/5% fixture, flagged 'estimate'.
+    const zero = calculateEquityCarryScore({ capRate: "0", price: "1000000", propertyType: "mfr", units: "4" });
+    expect(zero.cap_source).toBe("estimate");
+    expect(zero.deal_pool).toBe("discount");
+    expect(zero.downpayment_percent).toBe(30);
+    expect(calculateEquityCarryScore({ capRate: "-3", price: "1000000", propertyType: "mfr", units: "4" }).cap_source).toBe("estimate");
+  });
+
+  test("cocr15_price is the 30%-down / 70%-DSCR price that yields a 15% COCR on current NOI", () => {
+    // WHY: this is the stored '15% Target'. Verify the DEFINING property (round-trip): the COCR at
+    // 30% down, evaluated AT cocr15_price on the same NOI, is 15%. At $1M / 12% cap the deal is
+    // strong, so the 15%-COCR price sits ABOVE asking -> a positive discount (premium headroom).
+    // NOI = 1,000,000 * 0.12 = 120,000; residential tier 0.08 / 30yr.
+    const r = calculateEquityCarryScore({ capRate: "12.00", price: "1000000", propertyType: "mfr", units: "4" });
+    const roundTrip = calculateCOCRAtPercent(r.cocr15_price, 120000, 30, { dscrRate: 0.08, dscrTerm: 30 });
+    expect(roundTrip).toBeCloseTo(15, 0); // within the solver's 0.1% COCR tolerance
+    expect(r.cocr15_price).toBeGreaterThan(1000000); // strong deal -> target above asking
+    expect(r.cocr15_discount).toBeCloseTo((r.cocr15_price - 1000000) / 1000000, 10); // decimal fraction of asking
+  });
+
+  test("cocr30 is the actual COCR (percent) at asking with 30% down", () => {
+    // WHY: the 'Yield @30%' sub-line. Hand math at $1M / 12% cap: DSCR leg = 0.08805168 * 700,000
+    // = 61,636.18; cash flow = 120,000 - 61,636.18 = 58,363.82; over 300,000 invested = 19.45%.
+    const r = calculateEquityCarryScore({ capRate: "12.00", price: "1000000", propertyType: "mfr", units: "4" });
+    expect(r.cocr30).toBeCloseTo(19.45, 1);
+  });
+
+  test("a 5% deal needs a deep discount to reach 15% COCR (strongly negative cocr15_discount)", () => {
+    // WHY: proves the sign/magnitude the pipeline filter keys off. NOI = 50,000; the 15%-COCR
+    // price is far below asking, so cocr15_discount is strongly negative (a discount you must win).
+    const r = calculateEquityCarryScore({ capRate: "5.00", price: "1000000", propertyType: "mfr", units: "4" });
+    expect(r.cocr15_discount).toBeLessThan(-0.4);
+    expect(r.cocr15_price).toBeLessThan(1000000);
   });
 
   test("non-positive / non-numeric price returns null so the caller skips it (fail loud)", () => {
