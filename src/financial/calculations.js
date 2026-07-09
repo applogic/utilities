@@ -210,7 +210,7 @@ export function calculateNOIByType(askingPrice, capRate, propertyType = PROPERTY
   } = options;
 
   try {
-    switch (propertyType.toLowerCase()) {
+    switch ((propertyType || PROPERTY_TYPES.MULTIFAMILY).toLowerCase()) {
       case PROPERTY_TYPES.STR:
         return calculateSTRNOI(askingPrice, strApiResult, {
           grossRate: strGrossIncomeMultiplier,

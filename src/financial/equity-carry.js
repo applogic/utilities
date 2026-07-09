@@ -105,14 +105,15 @@ export function calculateEquityCarryScore({
   const reportedCapRate = Number.isFinite(capPercent) && capPercent > 0 ? capPercent / 100 : null;
 
   const unitsNum = Number(units);
-  const rateType = determineInterestRateType(propertyType, Number.isFinite(unitsNum) ? unitsNum : undefined);
+  const resolvedType = propertyType || "mfr";
+  const rateType = determineInterestRateType(resolvedType, Number.isFinite(unitsNum) ? unitsNum : undefined);
   const { amortization: dscrAmortization, rate: dscrRate } = INTEREST_RATE_TIERS[rateType];
 
   const { noi } = resolveListingFinancials({
     bedroomCount,
     estimatedCapRate: DEFAULT_CAP_RATE,
     price: priceNum,
-    propertyType,
+    propertyType: resolvedType,
     reportedCapRate,
   });
 

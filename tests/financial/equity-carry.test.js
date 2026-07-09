@@ -133,6 +133,22 @@ describe("calculateEquityCarryScore", () => {
     expect(r.cocr15_price).toBeLessThan(1000000);
   });
 
+  test("null property_type is scored as multifamily, not thrown into NOI 0 -> force-dead", () => {
+    // WHY: ~62% of the dead pool (392 rows) were rows with a null property_type. A null hit
+    // calculateNOIByType's propertyType.toLowerCase() -> throw -> NOI 0 -> forced dead, even
+    // though an unknown STRING ("Available") already falls through to the mfr default. null must
+    // behave IDENTICALLY to "mfr" across BOTH the DSCR tier and the NOI (a 5-unit row must land
+    // on the commercial tier, not residential) so a real multifamily is not buried in 'dead'.
+    // Inputs are the real "454 & 458 E 144th St" row that was mis-scored dead.
+    const nul = calculateEquityCarryScore({ capRate: "6.00", price: "3450000", propertyType: null, units: "5" });
+    const mfr = calculateEquityCarryScore({ capRate: "6.00", price: "3450000", propertyType: "mfr", units: "5" });
+    expect(nul.deal_pool).not.toBe("dead");
+    expect(nul.deal_pool).toBe(mfr.deal_pool);
+    expect(nul.downpayment_percent).toBe(mfr.downpayment_percent);
+    expect(nul.raw_yield).toBeCloseTo(mfr.raw_yield, 10);
+    expect(nul.cocr15_price).toBeCloseTo(mfr.cocr15_price, 4);
+  });
+
   test("non-positive / non-numeric price returns null so the caller skips it (fail loud)", () => {
     // WHY: a 0/null price would make NOI 0 and mis-score the row 'dead'. The SQL gate excludes
     // these, but the scorer also refuses them rather than emitting a bogus terminal bucket.
