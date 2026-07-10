@@ -16,8 +16,9 @@ export function createServices({ ctx }) {
     if (!state.cachedLoiData) updateState({ cachedLoiData: {} });
     if (state.cachedLoiData.leadStatus) {
       return {
-        leadStatus: state.cachedLoiData.leadStatus,
         contactName: state.cachedLoiData.contactName,
+        createdAt: state.cachedLoiData.createdAt,
+        leadStatus: state.cachedLoiData.leadStatus,
         opportunityAddress: state.cachedLoiData.opportunityAddress,
       };
     }
@@ -44,8 +45,9 @@ export function createServices({ ctx }) {
           break;
       }
       const loiData = {
-        leadStatus,
         contactName: data.contactName || "No contact available",
+        createdAt: data.createdAt || null,
+        leadStatus,
         opportunityAddress: data.opportunityAddress || "(Unknown)",
       };
       updateState({ cachedLoiData: loiData });

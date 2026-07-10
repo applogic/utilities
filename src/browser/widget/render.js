@@ -13,6 +13,7 @@ import { computeActiveCapDisplay, parsePriceNumber, parseReportedCap } from "../
 import { equityPercentFromDebt } from "../../financial/calculations.js";
 import { formatCurrency } from "../../financial/formatters.js";
 import { PROPERTY_TYPE_CONSTANTS } from "../../config/property-types.js";
+import { formatDate } from "../../date/utilities.js";
 
 const FINANCIAL_ELEMENT_IDS = [
   "prop-noi", "prop-down", "prop-net", "prop-seller-fi", "prop-cocr-30",
@@ -155,9 +156,11 @@ export function createRender({ ctx }) {
     if (!leadElement) return;
     let tooltipContent = "No LOI data returned";
     if (loiData) {
+      const filedDate = loiData.createdAt ? formatDate(loiData.createdAt) : "";
+      const filedLine = filedDate ? `<br><strong>Filed:</strong> ${filedDate}` : "";
       tooltipContent = `
       <strong>Contact:</strong> ${loiData.contactName}  <br>
-      ${loiData.opportunityAddress}
+      ${loiData.opportunityAddress}${filedLine}
     `;
     }
     const metric = leadElement.closest(".metric");
