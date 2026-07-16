@@ -7,6 +7,7 @@ import { getEnvVar } from "../environment/utilities.js";
 export const BUSINESS_CONSTANTS = {
   // Assignment and transaction fees
   ASSIGNMENT_FEE_PERCENTAGE: 0.05,    // 5% assignment fee
+  CASH_OFFER_ASSIGNMENT_PERCENTAGE: 0.07,  // 7% haircut off the 15%-COCR price for a cash offer (assignment + costs)
   NET_TO_BUYER_PERCENTAGE: 0.10,      // 10% net to buyer
   CLOSING_COSTS_PERCENTAGE: 0.0125,   // 1.25% closing costs
   HARD_MONEY_RATE: 0.03,     // 3% financing fee
@@ -47,6 +48,7 @@ export const BUSINESS_CONSTANTS = {
 // Convenience exports for commonly used values
 export const {
   ASSIGNMENT_FEE_PERCENTAGE,
+  CASH_OFFER_ASSIGNMENT_PERCENTAGE,
   NET_TO_BUYER_PERCENTAGE,
   CLOSING_COSTS_PERCENTAGE,
   HARD_MONEY_RATE,

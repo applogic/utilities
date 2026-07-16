@@ -10,6 +10,7 @@ export {
   calculateBalloonBalance,
   calculateCashFlow,
   calculateCashFlowYield,
+  calculateCashOfferPrice,
   calculateCashOutAfterRefi,
   calculateCOCR30, 
   calculateCOCRAtPercent,

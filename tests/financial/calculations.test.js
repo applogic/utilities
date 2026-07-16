@@ -9,6 +9,7 @@ import {
   calculateNOIByType,
   calculateSTRNOI,
   calculateAssignmentFee,
+  calculateCashOfferPrice,
   calculateNetToBuyer
 } from "../../src/financial/calculations.js";
 
@@ -250,6 +251,29 @@ describe("Core Financial Calculations", () => {
       const result = calculateAssignmentFee(askingPrice, 3);
       
       expect(result).toBe(15000); // 500k * 3%
+    });
+  });
+
+  describe("calculateCashOfferPrice", () => {
+    test("applies the config haircut to the 15%-COCR price by default", () => {
+      const cocr15Price = 1000000;
+      const result = calculateCashOfferPrice(cocr15Price);
+
+      const expected = cocr15Price * (1 - BUSINESS_CONSTANTS.CASH_OFFER_ASSIGNMENT_PERCENTAGE);
+      expect(result).toBe(expected);
+      expect(result).toBeCloseTo(930000, 6); // 1M less 7%
+    });
+
+    test("honors a custom haircut", () => {
+      expect(calculateCashOfferPrice(1000000, 0.05)).toBe(950000);
+    });
+
+    test("returns null for non-positive or non-numeric input", () => {
+      expect(calculateCashOfferPrice(0)).toBeNull();
+      expect(calculateCashOfferPrice(-5)).toBeNull();
+      expect(calculateCashOfferPrice(null)).toBeNull();
+      expect(calculateCashOfferPrice(undefined)).toBeNull();
+      expect(calculateCashOfferPrice("abc")).toBeNull();
     });
   });
 
