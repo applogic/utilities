@@ -118,143 +118,40 @@ function matchAddresses(searchQuery, opportunityAddress) {
 }
 
 /**
- * Parse CSV text into array of objects
- * Handles quoted fields with commas correctly
- * @param {string} csvText - CSV content
- * @returns {Array<Object>} Parsed rows
+ * Extract the property address from a GHL opportunity record
+ * Prefers the clean structured field, falls back to the "address + name" displayName
+ * @param {Object} opportunity - GHL opportunity record
+ * @returns {string} Property address
  */
-function parseCSV(csvText) {
-  const lines = csvText.split("\n").filter(line => line.trim());
-  if (lines.length === 0) return [];
-  
-  const rows = [];
-  
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    const cols = [];
-    let current = "";
-    let inQuotes = false;
-    
-    for (let j = 0; j < line.length; j++) {
-      const char = line[j];
-      
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === "," && !inQuotes) {
-        cols.push(current.trim());
-        current = "";
-      } else {
-        current += char;
-      }
-    }
-    cols.push(current.trim());
-    
-    if (cols.length >= 4 && cols[1]) {
-      rows.push({
-        address: cols[1],
-        contactName: cols[3] || null,
-        date: cols[2] || null,
-      });
-    }
+function extractOpportunityAddress(opportunity) {
+  if (opportunity.fields?.full_property_address) {
+    return opportunity.fields.full_property_address;
   }
-  
-  return rows;
-}
-
-/**
- * Lookup LOI from Google Spreadsheet
- * DELETE THIS FUNCTION when phasing out spreadsheet
- * @param {string} searchQuery - Property address to search
- * @returns {Promise<Object>} Lookup result
- */
-async function lookupFromSpreadsheet(searchQuery) {
-  try {
-    const response = await fetch(LOI_LOOKUP_CONFIG.SPREADSHEET_URL, {
-      headers: {
-        "Accept": "text/csv",
-      },
-      method: "GET",
-    });
-    
-    if (!response.ok) {
-      console.log('lookupFromSpreadsheet response not ok', response)
-      return {
-        data: null,
-        matchType: MATCH_TYPES.NO_RESPONSE,
-        searchQuery,
-      };
-    }
-    
-    const csvText = await response.text();
-    const rows = parseCSV(csvText);
-    
-    let bestMatch = null;
-    let bestScore = 0;
-    
-    for (const row of rows) {
-      const matchResult = matchAddresses(searchQuery, row.address);
-      
-      if (matchResult.matchType !== MATCH_TYPES.NO_MATCH && matchResult.score > bestScore) {
-        bestScore = matchResult.score;
-        bestMatch = {
-          data: {
-            contactName: row.contactName,
-            createdAt: row.date,
-            opportunityAddress: row.address,
-            opportunityName: row.address,
-            statusOrStage: LOI_LOOKUP_CONFIG.LOI_SENT_STATUS,
-            updatedAt: row.date,
-            foundIn: "spreadsheet",
-          },
-          matchType: matchResult.matchType,
-          score: matchResult.score,
-          searchQuery,
-        };
-      }
-    }
-    
-    if (bestMatch) {
-      return bestMatch;
-    }
-    
-    return {
-      data: null,
-      matchType: MATCH_TYPES.NO_MATCH,
-      searchQuery,
-    };
-    
-  } catch (error) {
-    return {
-      data: null,
-      error: error.message,
-      matchType: MATCH_TYPES.NO_RESPONSE,
-      searchQuery,
-    };
+  if (opportunity.displayName) {
+    return opportunity.displayName.split("+")[0].trim();
   }
+  return "";
 }
 
 /**
  * Lookup LOI from API
- * This function will remain after spreadsheet is phased out
+ * Queries the GHL lookup endpoint, which returns an array of matching opportunities
  * @param {string} searchQuery - Property address to search
  * @returns {Promise<Object>} Lookup result
  */
 async function lookupFromAPI(searchQuery) {
   try {
-    const url = new URL(LOI_LOOKUP_CONFIG.API_BASE_URL);
-    url.pathname = LOI_LOOKUP_CONFIG.WEBHOOK_PATH;
-    url.searchParams.set("location_id", LOI_LOOKUP_CONFIG.LOCATION_ID);
+    const url = new URL(LOI_LOOKUP_CONFIG.LOOKUP_PATH, LOI_LOOKUP_CONFIG.API_BASE_URL);
     url.searchParams.set("q", searchQuery);
-    
+
     const response = await fetch(url.toString(), {
       headers: {
         "Accept": "application/json",
       },
       method: "GET",
     });
-    
+
     if (!response.ok) {
-      console.log("LOI lookupFromAPI !response.ok", response)
       return {
         data: null,
         error: `HTTP ${response.status}`,
@@ -262,46 +159,58 @@ async function lookupFromAPI(searchQuery) {
         searchQuery,
       };
     }
-    
-    const data = await response.json();
-    
-    if (!data) {
-      console.log("LOI lookupFromAPI !data", response)
-      return {
-        data: null,
-        matchType: MATCH_TYPES.NO_RESPONSE,
-        searchQuery,
-      };
-    }
 
-    if (data.notFound) {
+    const results = await response.json();
+
+    if (!Array.isArray(results) || results.length === 0) {
       return {
         data: null,
         matchType: MATCH_TYPES.NO_MATCH,
         searchQuery,
       };
     }
-    
-    const opportunityAddress = data.opportunityName.split("+")[0].trim();
-    const matchResult = matchAddresses(searchQuery, opportunityAddress);
-    
+
+    let bestMatch = null;
+    let bestScore = 0;
+
+    for (const opportunity of results) {
+      const opportunityAddress = extractOpportunityAddress(opportunity);
+      if (!opportunityAddress) continue;
+
+      const matchResult = matchAddresses(searchQuery, opportunityAddress);
+
+      if (matchResult.matchType !== MATCH_TYPES.NO_MATCH && matchResult.score > bestScore) {
+        bestScore = matchResult.score;
+        bestMatch = {
+          data: {
+            contactEmail: opportunity.contactEmail || null,
+            contactName: opportunity.studentName || null,
+            createdAt: opportunity.createdAt || null,
+            foundIn: "api",
+            loiTrackingNumber: opportunity.fields?.loi_tracking_number || null,
+            opportunityAddress,
+            opportunityName: opportunity.displayName || opportunityAddress,
+            statusOrStage: opportunity.stage || null,
+            updatedAt: opportunity.updatedAt || null,
+          },
+          matchType: matchResult.matchType,
+          score: matchResult.score,
+          searchQuery,
+        };
+      }
+    }
+
+    if (bestMatch) {
+      return bestMatch;
+    }
+
     return {
-      data: {
-        contactName: data.contactName,
-        createdAt: data.createdAt,
-        opportunityAddress,
-        opportunityName: data.opportunityName,
-        statusOrStage: data.statusOrStage,
-        updatedAt: data.updatedAt,
-        foundIn: "api",
-      },
-      matchType: matchResult.matchType,
-      score: matchResult.score,
+      data: null,
+      matchType: MATCH_TYPES.NO_MATCH,
       searchQuery,
     };
-    
+
   } catch (error) {
-    console.log('lookupFromAPI error', error)
     return {
       data: null,
       error: error.message,
@@ -324,11 +233,6 @@ export async function lookupLOI(searchQuery) {
       searchQuery,
     };
   }
-  
-  // const spreadsheetResult = await lookupFromSpreadsheet(searchQuery);
-  // if (spreadsheetResult.matchType !== MATCH_TYPES.NO_MATCH && spreadsheetResult.matchType !== MATCH_TYPES.NO_RESPONSE) {
-  //   return spreadsheetResult;
-  // }
-  
+
   return await lookupFromAPI(searchQuery);
 }
