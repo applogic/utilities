@@ -312,15 +312,26 @@ export function calculateAssignmentFee(askingPrice, assignmentPercent = BUSINESS
 /**
  * Calculate the all-cash offer price from the 15%-COCR price.
  * The cash offer is the standard-investor 15%-COCR price less a haircut that
- * covers the assignment fee and associated costs.
+ * covers the assignment fee and associated costs, then floored DOWN to the
+ * rounding step. Flooring (never rounding up) keeps the offer at or below the
+ * 15%-COCR maximum threshold.
  * @param {number} cocr15Price - Price at which COCR hits 15% on the NOI (dollars)
  * @param {number} assignmentPercent - Haircut as a decimal (uses config default)
+ * @param {number} roundingStep - Floor the result down to this step; 0 disables (uses config default)
  * @returns {number|null} Cash offer price, or null when cocr15Price is not a positive number
  */
-export function calculateCashOfferPrice(cocr15Price, assignmentPercent = BUSINESS_CONSTANTS.CASH_OFFER_ASSIGNMENT_PERCENTAGE) {
+export function calculateCashOfferPrice(
+  cocr15Price,
+  assignmentPercent = BUSINESS_CONSTANTS.CASH_OFFER_ASSIGNMENT_PERCENTAGE,
+  roundingStep = BUSINESS_CONSTANTS.CASH_OFFER_ROUNDING
+) {
   const price = Number(cocr15Price);
   if (!Number.isFinite(price) || price <= 0) return null;
-  return price * (1 - assignmentPercent);
+  const haircutPrice = price * (1 - assignmentPercent);
+  if (!Number.isFinite(roundingStep) || roundingStep <= 0) return haircutPrice;
+  // Round to whole dollars first so binary-float noise (e.g. 929999.9999) can't
+  // knock the value down a whole step, then floor to the step.
+  return Math.floor(Math.round(haircutPrice) / roundingStep) * roundingStep;
 }
 
 /**

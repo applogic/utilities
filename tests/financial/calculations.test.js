@@ -255,17 +255,29 @@ describe("Core Financial Calculations", () => {
   });
 
   describe("calculateCashOfferPrice", () => {
-    test("applies the config haircut to the 15%-COCR price by default", () => {
-      const cocr15Price = 1000000;
-      const result = calculateCashOfferPrice(cocr15Price);
+    test("applies the config haircut and floors to the config step", () => {
+      // 1,000,000 less 7% = 930,000, already on the $10k grid.
+      // Guards the float-noise case (930000.0000001 / 929999.9999) from
+      // dropping a whole step.
+      expect(calculateCashOfferPrice(1000000)).toBe(930000);
+    });
 
-      const expected = cocr15Price * (1 - BUSINESS_CONSTANTS.CASH_OFFER_ASSIGNMENT_PERCENTAGE);
-      expect(result).toBe(expected);
-      expect(result).toBeCloseTo(930000, 6); // 1M less 7%
+    test("floors DOWN to the step, never up", () => {
+      // 1,000,000 less 7.5% = 925,000 -> floors to 920,000 on the $10k grid
+      expect(calculateCashOfferPrice(1000000, 0.075)).toBe(920000);
     });
 
     test("honors a custom haircut", () => {
       expect(calculateCashOfferPrice(1000000, 0.05)).toBe(950000);
+    });
+
+    test("honors a custom rounding step", () => {
+      // 930,000 floored to the $25k grid = 925,000
+      expect(calculateCashOfferPrice(1000000, 0.07, 25000)).toBe(925000);
+    });
+
+    test("a zero rounding step disables flooring", () => {
+      expect(calculateCashOfferPrice(1000000, 0.075, 0)).toBeCloseTo(925000, 6);
     });
 
     test("returns null for non-positive or non-numeric input", () => {
