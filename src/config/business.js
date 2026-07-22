@@ -10,6 +10,7 @@ export const BUSINESS_CONSTANTS = {
   CASH_OFFER_ASSIGNMENT_PERCENTAGE: 0.07,  // 7% haircut off the 15%-COCR price for a cash offer (assignment + costs)
   CASH_OFFER_ROUNDING: 10000,  // cash offer price floors DOWN to this step (stays at/below the 15%-COCR max threshold)
   NET_TO_BUYER_PERCENTAGE: 0.10,      // 10% net to buyer
+  SELLER_FINANCE_MAX_DOWN_PERCENT: 9.2,  // ceiling on the down payment for a Standard Seller Financing offer (whole percent); down = min(down-for-15%-COCR, this)
   CLOSING_COSTS_PERCENTAGE: 0.0125,   // 1.25% closing costs
   HARD_MONEY_RATE: 0.03,     // 3% financing fee
   REHAB_RATE: 0.0,              // 0% rehab fee
@@ -54,6 +55,7 @@ export const {
   NET_TO_BUYER_PERCENTAGE,
   CLOSING_COSTS_PERCENTAGE,
   HARD_MONEY_RATE,
+  SELLER_FINANCE_MAX_DOWN_PERCENT,
   SELLER_AGENT_COMMISSION,
   BUYER_AGENT_COMMISSION,
   MINIMUM_COCR15_PRICE,

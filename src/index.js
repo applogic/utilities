@@ -20,6 +20,7 @@ export {
   calculatePMT,
   calculatePriceForCOCR,
   calculatePriceFromDiscount,
+  calculateSellerFinanceOffer,
   calculateSTRNOI,
   equityPercentFromDebt,
   resolveListingFinancials,

@@ -335,6 +335,91 @@ export function calculateCashOfferPrice(
 }
 
 /**
+ * Solve and analyze a Standard Seller Financing offer (pure seller carry: down payment
+ * plus seller note equal 100% of the offer price — no bank/DSCR leg).
+ *
+ * The down payment is solved to the value that yields the target cash-on-cash return,
+ * then capped at maxDownPercent. In the default 0%-interest structure the COCR falls as
+ * the down payment rises (more cash for the same debt service), so:
+ *   - if the target COCR is reachable at <= maxDownPercent down, that exact down is used
+ *     (COCR lands on target);
+ *   - otherwise the down is capped at maxDownPercent and the COCR comes in ABOVE target.
+ * Either way the down never exceeds maxDownPercent and the COCR never falls below target
+ * for a cash-flowing deal. A deal that cannot cash-flow even at the minimum down (COCR at
+ * minDownPercent already below target) returns minDownPercent with its actual (poor) COCR.
+ *
+ * @param {number} noi - Annual net operating income
+ * @param {number} price - Offer price the down payment and seller note are sized against
+ * @param {Object} options - Term and target overrides (default to config constants)
+ * @param {number} [options.amortizationYears] - Seller note amortization (years)
+ * @param {number} [options.interestRate] - Seller note annual interest rate (decimal, e.g. 0.07)
+ * @param {number} [options.maxDownPercent] - Down-payment ceiling (whole percent)
+ * @param {number} [options.minDownPercent] - Down-payment floor (whole percent)
+ * @param {number} [options.targetCOCR] - Target cash-on-cash return (whole percent)
+ * @param {number} [options.yearsBalloon] - Balloon period (years)
+ * @returns {{annualCashFlow:number, annualDebtService:number, balloonBalance:number, capped:boolean, cashFlowYield:number, cocr:number, downPaymentAmount:number, downPercent:number, monthlyPayment:number, sellerNoteAmount:number, solvedDownPercent:number, totalPaymentsToBalloon:number}}
+ */
+export function calculateSellerFinanceOffer(noi, price, options = {}) {
+  const {
+    amortizationYears = FINANCIAL_CONSTANTS.SELLER_FI_AMORTIZATION,
+    interestRate = FINANCIAL_CONSTANTS.SELLER_FI_INTEREST_RATE,
+    maxDownPercent = BUSINESS_CONSTANTS.SELLER_FINANCE_MAX_DOWN_PERCENT,
+    minDownPercent = 1,
+    targetCOCR = 15,
+    yearsBalloon = FINANCIAL_CONSTANTS.DEFAULT_BALLOON_PERIOD_YEARS,
+  } = options;
+
+  const cocrAtDown = (downPercent) => {
+    const downPaymentAmount = price * (downPercent / 100);
+    const sellerNoteAmount = price * ((100 - downPercent) / 100);
+    const monthlyPayment = sellerNoteAmount > 0 ? calculatePMT(sellerNoteAmount, interestRate, amortizationYears) : 0;
+    const annualCashFlow = noi - monthlyPayment * 12;
+    return downPaymentAmount > 0 ? (annualCashFlow / downPaymentAmount) * 100 : 0;
+  };
+
+  let solvedDownPercent;
+  if (cocrAtDown(minDownPercent) <= targetCOCR) {
+    solvedDownPercent = minDownPercent;
+  } else {
+    let low = minDownPercent;
+    let high = 100;
+    let iterations = 0;
+    while (iterations < BUSINESS_CONSTANTS.MAX_ITERATIONS && high - low > 0.01) {
+      const mid = (low + high) / 2;
+      if (cocrAtDown(mid) < targetCOCR) {
+        high = mid;
+      } else {
+        low = mid;
+      }
+      iterations++;
+    }
+    solvedDownPercent = (low + high) / 2;
+  }
+
+  const downPercent = Math.min(solvedDownPercent, maxDownPercent);
+  const downPaymentAmount = price * (downPercent / 100);
+  const sellerNoteAmount = price * ((100 - downPercent) / 100);
+  const monthlyPayment = sellerNoteAmount > 0 ? calculatePMT(sellerNoteAmount, interestRate, amortizationYears) : 0;
+  const annualDebtService = monthlyPayment * 12;
+  const annualCashFlow = noi - annualDebtService;
+
+  return {
+    annualCashFlow,
+    annualDebtService,
+    balloonBalance: calculateBalloonBalance(sellerNoteAmount, interestRate, amortizationYears, yearsBalloon),
+    capped: solvedDownPercent > maxDownPercent,
+    cashFlowYield: price > 0 ? (annualCashFlow / price) * 100 : 0,
+    cocr: downPaymentAmount > 0 ? (annualCashFlow / downPaymentAmount) * 100 : 0,
+    downPaymentAmount,
+    downPercent,
+    monthlyPayment,
+    sellerNoteAmount,
+    solvedDownPercent,
+    totalPaymentsToBalloon: annualDebtService * yearsBalloon,
+  };
+}
+
+/**
  * Calculate net to buyer
  * @param {number} askingPrice - Property asking price
  * @param {Object} options - Configuration options (uses config constants as defaults)
