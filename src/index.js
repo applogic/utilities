@@ -30,6 +30,16 @@ export {
 // Equity Carry scoring engine (pure; scores scraped listings into deal pools)
 export { EQUITY_CARRY_TIERS, calculateEquityCarryScore } from "./financial/equity-carry.js";
 
+// Business-backed-by-real-estate underwriting (pure; offer range + collateral down payment)
+export {
+  BUSINESS_UNDERWRITING_CONSTANTS,
+  calculateBusinessDownPayment,
+  calculateBusinessOffer,
+  resolveBusinessEarnings,
+  shouldIncludeRealEstate,
+  underwriteBusinessListing,
+} from "./financial/business-underwriting.js";
+
 // Agnostic debt service (pure IO; Node + browser)
 export { fetchDebt } from "./services/debt.js";
 
