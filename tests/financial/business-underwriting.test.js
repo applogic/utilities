@@ -126,14 +126,14 @@ describe("calculateBusinessDownPayment", () => {
     expect(calculateBusinessDownPayment({ realEstateValue: "$2,000,000" }).downPayment).toBe(1000000);
   });
 
-  test("an excluded asset stops securing the down payment", () => {
-    // WHY: the include flags gate the offer, so they must gate the collateral too.
-    // An excluded building is not being bought; counting half its value as collateral
-    // would quote a down payment secured by an asset that is not in the deal.
-    // Hand math with the real estate out: 0.30*500,000 = 150,000
-    //                                   + 0.20*200,000 =  40,000
-    //                                   + 0.20*1,500,000 = 300,000
-    //                                   =                  490,000
+  test("an asset kept out of the offer range still secures the down payment", () => {
+    // WHY: this is the distinction the whole model turns on, and it is easy to collapse.
+    // include_* answers "is this ADDED to the offer on top of the multiple", NOT "is this
+    // being bought". A building worth exactly the asking price is not added (that would
+    // quote a ceiling above the ask) but it is still acquired and still secures half its
+    // value. Gating collateral on that flag zeroes the down payment on precisely the
+    // listings where the real estate is the whole thesis.
+    // Hand math: 0.50*3,000,000 + 0.30*500,000 + 0.20*200,000 + 0.20*1,500,000 = 1,990,000
     const result = calculateBusinessDownPayment({
       ebitda: 1500000,
       ffeValue: 500000,
@@ -142,18 +142,19 @@ describe("calculateBusinessDownPayment", () => {
       realEstateValue: 3000000,
     });
 
-    expect(result.legs.realEstate).toBe(0);
-    expect(result.downPayment).toBe(490000);
+    expect(result.legs.realEstate).toBe(1500000);
+    expect(result.downPayment).toBe(1990000);
   });
 
-  test("excluding EBITDA drops only its advance, leaving the tangible legs intact", () => {
-    // WHY: the EBITDA flag governs collateral alone. It must not disturb the assets,
-    // and it must not be confused with the earnings figure driving the multiple.
+  test("collateralizeEbitda drops only its advance, leaving the tangible legs intact", () => {
+    // WHY: the one collateral switch that exists, named apart from include_* because it
+    // answers the other question. EBITDA never enters the offer range, so there is no
+    // include_ebitda for it to be confused with.
     // Hand math: 0.50*3,000,000 + 0.30*500,000 + 0.20*200,000 = 1,690,000
     const result = calculateBusinessDownPayment({
+      collateralizeEbitda: false,
       ebitda: 1500000,
       ffeValue: 500000,
-      includeEbitda: false,
       inventoryValue: 200000,
       realEstateValue: 3000000,
     });
@@ -162,10 +163,10 @@ describe("calculateBusinessDownPayment", () => {
     expect(result.downPayment).toBe(1690000);
   });
 
-  test("every flag defaults on, so an unflagged caller keeps the full stack", () => {
-    // WHY: backwards compatibility. Callers predating the flags pass none, and an asset
+  test("collateralizeEbitda defaults on, so an unflagged caller keeps the full stack", () => {
+    // WHY: backwards compatibility. Callers predating the switch pass none, and an asset
     // silently dropped from the collateral is the more damaging error.
-    expect(calculateBusinessDownPayment({ realEstateValue: 1000000 }).downPayment).toBe(500000);
+    expect(calculateBusinessDownPayment({ ebitda: 1500000 }).downPayment).toBe(300000);
   });
 });
 
@@ -338,35 +339,29 @@ describe("underwriteBusinessListing", () => {
   });
 
   test("flags a collateral shortfall instead of clamping it", () => {
-    // WHY: real estate worth far more than the earnings justify is a genuine signal, not
-    // an error to hide. Reaching it takes LOSSES, not merely thin earnings: every advance
-    // rate is below 1, so an included asset always adds more to the offer than to the
-    // collateral, and the EBITDA leg (0.20x) is dominated by the 3x multiple taken on the
-    // same figure. A business losing money against valuable real estate is the remaining
-    // case — and is exactly the distressed target this pipeline exists to find.
-    //
-    // Hand math: down = 0.50*5,000,000               = 2,500,000  (EBITDA leg dormant)
-    //            high = 3*(-2,000,000) + 5,000,000   = -1,000,000
-    //            2,500,000 > -1,000,000 -> shortfall
+    // WHY: real estate worth far more than the earnings justify is a genuine signal,
+    // not an error to hide. Hand math: down = 0.50*5,000,000 = 2,500,000;
+    // high = 3*50,000 + 5,000,000 = 5,150,000... still covered, so push earnings lower
+    // with the real estate excluded from the offer: high = 3*50,000 = 150,000 < 2,500,000.
     const result = underwriteBusinessListing({
-      ebitda: -2000000,
+      ebitda: 50000,
+      include_real_estate: false,
       real_estate_value: 5000000,
     });
 
     expect(result.downPayment).toBe(2500000);
-    expect(result.offerHigh).toBe(-1000000);
+    expect(result.offerHigh).toBe(150000);
     expect(result.collateralShortfall).toBe(true);
-    expect(result.sellerCarry).toBe(-3500000);
+    expect(result.sellerCarry).toBe(-2350000);
   });
 
-  test("the include flags move the collateral and the offer together", () => {
-    // WHY: this is the regression. Excluding the real estate used to drop it from the
-    // offer while leaving half its value in the down payment — quoting collateral drawn
-    // from a building that is not in the deal.
-    // Hand math with the real estate out: down = 0.30*500,000 + 0.20*200,000
-    //                                          + 0.20*1,500,000 = 490,000
-    //                                     high = 3*1,500,000 + 500,000 + 200,000
-    //                                          = 5,200,000
+  test("an offer-range exclusion leaves the collateral stack untouched", () => {
+    // WHY: the regression guard. include_real_estate is about double-counting in the
+    // offer, never about whether the asset conveys — so excluding it must move
+    // assetsIncluded and offerHigh while downPayment stays exactly where it was.
+    // Hand math: down = 0.50*3,000,000 + 0.30*500,000 + 0.20*200,000 + 0.20*1,500,000
+    //                 = 1,990,000  (unchanged by the flag)
+    //            high = 3*1,500,000 + 500,000 + 200,000 = 5,200,000
     const result = underwriteBusinessListing({
       ebitda: "1500000",
       ff_e_value: "500000",
@@ -375,8 +370,8 @@ describe("underwriteBusinessListing", () => {
       real_estate_value: "3000000",
     });
 
-    expect(result.downPayment).toBe(490000);
-    expect(result.legs.realEstate).toBe(0);
+    expect(result.downPayment).toBe(1990000);
+    expect(result.legs.realEstate).toBe(1500000);
     expect(result.assetsIncluded).toBe(700000);
     expect(result.offerHigh).toBe(5200000);
   });

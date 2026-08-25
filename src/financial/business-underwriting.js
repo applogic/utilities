@@ -94,27 +94,27 @@ export function shouldIncludeRealEstate(inputs = {}) {
  * $1M. Each leg is capped at its own rate, and a leg with no reported value
  * contributes nothing.
  *
- * The include flags gate the legs, because they gate the offer: an asset that is
- * not being bought cannot secure the down payment for the purchase. Without this
- * the two halves of the underwrite disagree — excluding the real estate would drop
- * it from the offer while still counting half its value as collateral, quoting a
- * down payment backed by a building that is not in the deal.
+ * Deliberately NOT gated by the include_* flags. Those flags answer a different
+ * question — whether an asset is ADDED to the offer on top of the earnings
+ * multiple — and an asset excluded there is still being acquired. The common case
+ * is a building whose value equals the asking price: it is not added to the offer
+ * (that would quote a ceiling above the ask) but it is still bought, and it still
+ * secures half its value. Gating this on those flags zeroes the collateral on
+ * exactly the listings where the real estate matters most.
  *
  * The EBITDA leg reads EBITDA specifically, not the coalesced earnings figure —
  * an SDE-only listing does not qualify, because SDE includes owner compensation
- * and is not the same measure the threshold was set against. Its flag governs
- * collateral only; EBITDA is the base the offer multiple is taken against, so
- * adding it to the offer range as well would quote 4x while reporting 3x.
+ * and is not the same measure the threshold was set against. collateralizeEbitda
+ * is a collateral-only switch, named apart from the include_* flags because it
+ * answers that different question: EBITDA is the base the offer multiple is taken
+ * against, so it never joins the offer range at all.
  *
  * @param {object} inputs
  * @param {number} [inputs.realEstateValue]
  * @param {number} [inputs.ffeValue]
  * @param {number} [inputs.inventoryValue]
  * @param {number} [inputs.ebitda]
- * @param {boolean} [inputs.includeRealEstate=true]
- * @param {boolean} [inputs.includeFfe=true]
- * @param {boolean} [inputs.includeInventory=true]
- * @param {boolean} [inputs.includeEbitda=true]
+ * @param {boolean} [inputs.collateralizeEbitda=true]
  * @returns {{downPayment:number, legs:{realEstate:number, ffe:number, inventory:number, ebitda:number}}}
  */
 export function calculateBusinessDownPayment(inputs = {}) {
@@ -126,17 +126,12 @@ export function calculateBusinessDownPayment(inputs = {}) {
     REAL_ESTATE_ADVANCE_RATE,
   } = BUSINESS_UNDERWRITING_CONSTANTS;
 
-  const {
-    includeEbitda = true,
-    includeFfe = true,
-    includeInventory = true,
-    includeRealEstate = true,
-  } = inputs;
+  const { collateralizeEbitda = true } = inputs;
 
-  const realEstateValue = includeRealEstate ? toNonNegative(inputs.realEstateValue) ?? 0 : 0;
-  const ffeValue = includeFfe ? toNonNegative(inputs.ffeValue) ?? 0 : 0;
-  const inventoryValue = includeInventory ? toNonNegative(inputs.inventoryValue) ?? 0 : 0;
-  const ebitda = includeEbitda ? toNumber(inputs.ebitda) ?? 0 : 0;
+  const realEstateValue = toNonNegative(inputs.realEstateValue) ?? 0;
+  const ffeValue = toNonNegative(inputs.ffeValue) ?? 0;
+  const inventoryValue = toNonNegative(inputs.inventoryValue) ?? 0;
+  const ebitda = collateralizeEbitda ? toNumber(inputs.ebitda) ?? 0 : 0;
 
   const legs = {
     ebitda: ebitda >= EBITDA_ADVANCE_THRESHOLD ? ebitda * EBITDA_ADVANCE_RATE : 0,
@@ -295,20 +290,13 @@ export function underwriteBusinessListing(listing = {}) {
     sde: listing.sde,
   });
 
-  // One set of flags drives both the collateral stack and the offer range, so an
-  // asset excluded from the deal leaves both at once.
-  const includeEbitda = listing.includeEbitda ?? listing.include_ebitda ?? true;
-  const includeFfe = listing.includeFfe ?? listing.include_ff_e ?? true;
-  const includeInventory = listing.includeInventory ?? listing.include_inventory ?? true;
-  const includeRealEstate = listing.includeRealEstate ?? listing.include_real_estate ?? true;
-
+  // The collateral stack covers everything being acquired, so it takes no include_*
+  // flag — those govern only what is ADDED to the offer range. Its one switch is
+  // collateralizeEbitda, which has no offer-range counterpart.
   const { downPayment, legs } = calculateBusinessDownPayment({
+    collateralizeEbitda: listing.collateralizeEbitda ?? listing.collateralize_ebitda ?? true,
     ebitda,
     ffeValue,
-    includeEbitda,
-    includeFfe,
-    includeInventory,
-    includeRealEstate,
     inventoryValue,
     realEstateValue,
   });
@@ -316,9 +304,9 @@ export function underwriteBusinessListing(listing = {}) {
   const { assetsIncluded, offerHigh, offerLow } = calculateBusinessOffer({
     earnings,
     ffeValue,
-    includeFfe,
-    includeInventory,
-    includeRealEstate,
+    includeFfe: listing.includeFfe ?? listing.include_ff_e ?? true,
+    includeInventory: listing.includeInventory ?? listing.include_inventory ?? true,
+    includeRealEstate: listing.includeRealEstate ?? listing.include_real_estate ?? true,
     inventoryValue,
     realEstateValue,
   });
