@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   calculateBusinessDownPayment,
   calculateBusinessOffer,
+  calculateBusinessSellerFinance,
   resolveBusinessEarnings,
   shouldIncludeRealEstate,
   underwriteBusinessListing,
@@ -124,6 +125,136 @@ describe("calculateBusinessDownPayment", () => {
     // Hand math: 0.50 * 2,000,000 = 1,000,000, with no FF&E or inventory reported.
     expect(calculateBusinessDownPayment({ realEstateValue: "$2,000,000" }).downPayment).toBe(1000000);
   });
+
+  test("an excluded asset stops securing the down payment", () => {
+    // WHY: the include flags gate the offer, so they must gate the collateral too.
+    // An excluded building is not being bought; counting half its value as collateral
+    // would quote a down payment secured by an asset that is not in the deal.
+    // Hand math with the real estate out: 0.30*500,000 = 150,000
+    //                                   + 0.20*200,000 =  40,000
+    //                                   + 0.20*1,500,000 = 300,000
+    //                                   =                  490,000
+    const result = calculateBusinessDownPayment({
+      ebitda: 1500000,
+      ffeValue: 500000,
+      includeRealEstate: false,
+      inventoryValue: 200000,
+      realEstateValue: 3000000,
+    });
+
+    expect(result.legs.realEstate).toBe(0);
+    expect(result.downPayment).toBe(490000);
+  });
+
+  test("excluding EBITDA drops only its advance, leaving the tangible legs intact", () => {
+    // WHY: the EBITDA flag governs collateral alone. It must not disturb the assets,
+    // and it must not be confused with the earnings figure driving the multiple.
+    // Hand math: 0.50*3,000,000 + 0.30*500,000 + 0.20*200,000 = 1,690,000
+    const result = calculateBusinessDownPayment({
+      ebitda: 1500000,
+      ffeValue: 500000,
+      includeEbitda: false,
+      inventoryValue: 200000,
+      realEstateValue: 3000000,
+    });
+
+    expect(result.legs.ebitda).toBe(0);
+    expect(result.downPayment).toBe(1690000);
+  });
+
+  test("every flag defaults on, so an unflagged caller keeps the full stack", () => {
+    // WHY: backwards compatibility. Callers predating the flags pass none, and an asset
+    // silently dropped from the collateral is the more damaging error.
+    expect(calculateBusinessDownPayment({ realEstateValue: 1000000 }).downPayment).toBe(500000);
+  });
+});
+
+describe("calculateBusinessSellerFinance", () => {
+  // The seller carries whatever the collateral down payment leaves on the offered
+  // price. Fixtures use 5,000,000 offered against 2,000,000 down, so the carry is
+  // 3,000,000 throughout and each mode's arithmetic is comparable at a glance.
+
+  test("amortizes the carry and reports the balance still owed at the balloon", () => {
+    // Hand math at 0% over 30 years, 7-year balloon:
+    //   carry    = 5,000,000 - 2,000,000 = 3,000,000
+    //   payment  = 3,000,000 / 360       =     8,333.33
+    //   balloon  = 3,000,000 * (360-84)/360 = 2,300,000
+    //   payments = 8,333.33 * 12 * 7     =   700,000
+    const result = calculateBusinessSellerFinance({
+      amortizationYears: 30,
+      balloonYears: 7,
+      downPayment: 2000000,
+      interestRate: 0,
+      priceOffered: 5000000,
+    });
+
+    expect(result.sellerFinanced).toBe(3000000);
+    expect(result.sfPayment).toBeCloseTo(8333.333333, 4);
+    expect(result.balloonBalance).toBe(2300000);
+    expect(result.totalPayments).toBeCloseTo(700000, 4);
+    expect(result.performancePayout).toBe(0);
+  });
+
+  test("simple payout defers interest to the balloon instead of the payment", () => {
+    // WHY: in payout mode the running payment is principal-only, so the interest has to
+    // reappear at the balloon or the seller is never paid it at all.
+    // Hand math: payout  = 3,000,000 * 0.05 * 7 = 1,050,000
+    //            balloon = 3,000,000 + 1,050,000 = 4,050,000  (principal undiminished)
+    const result = calculateBusinessSellerFinance({
+      amortizationYears: 30,
+      balloonYears: 7,
+      downPayment: 2000000,
+      interestPaymentMode: "simple_payout",
+      interestRate: 0.05,
+      priceOffered: 5000000,
+    });
+
+    expect(result.sfPayment).toBeCloseTo(8333.333333, 4);
+    expect(result.performancePayout).toBe(1050000);
+    expect(result.balloonBalance).toBe(4050000);
+  });
+
+  test("compound payout accrues the deferred interest, not just multiplies it", () => {
+    // WHY: this is the only difference from simple payout, so it is the whole test.
+    // Hand math: 1.05^7 = 1.40710042265625
+    //            payout = 3,000,000 * 0.40710042265625 = 1,221,301.26796875
+    const result = calculateBusinessSellerFinance({
+      amortizationYears: 30,
+      balloonYears: 7,
+      downPayment: 2000000,
+      interestPaymentMode: "compound_payout",
+      interestRate: 0.05,
+      priceOffered: 5000000,
+    });
+
+    expect(result.performancePayout).toBeCloseTo(1221301.26796875, 6);
+    expect(result.balloonBalance).toBeCloseTo(4221301.26796875, 6);
+  });
+
+  test("reports nulls until a price is actually offered", () => {
+    // WHY: the offer is a range and the LOI needs one number. A zeroed payment schedule
+    // would render on an LOI as real terms — $0 payments against a $0 balloon — so the
+    // absence of a chosen price has to stay visible instead of collapsing to zero.
+    expect(calculateBusinessSellerFinance({ downPayment: 2000000 })).toEqual({
+      balloonBalance: null,
+      performancePayout: 0,
+      sellerFinanced: null,
+      sfPayment: null,
+      totalPayments: null,
+    });
+  });
+
+  test("never carries a negative balance when collateral outruns the offer", () => {
+    // WHY: a down payment above the price is a real signal (collateralShortfall), but it
+    // must not invert into a carry the seller somehow owes the buyer.
+    const result = calculateBusinessSellerFinance({
+      downPayment: 2000000,
+      priceOffered: 1000000,
+    });
+
+    expect(result.sellerFinanced).toBe(0);
+    expect(result.balloonBalance).toBe(0);
+  });
 });
 
 describe("calculateBusinessOffer", () => {
@@ -207,20 +338,83 @@ describe("underwriteBusinessListing", () => {
   });
 
   test("flags a collateral shortfall instead of clamping it", () => {
-    // WHY: real estate worth far more than the earnings justify is a genuine signal,
-    // not an error to hide. Hand math: down = 0.50*5,000,000 = 2,500,000;
-    // high = 3*50,000 + 5,000,000 = 5,150,000... still covered, so push earnings lower
-    // with the real estate excluded from the offer: high = 3*50,000 = 150,000 < 2,500,000.
+    // WHY: real estate worth far more than the earnings justify is a genuine signal, not
+    // an error to hide. Reaching it takes LOSSES, not merely thin earnings: every advance
+    // rate is below 1, so an included asset always adds more to the offer than to the
+    // collateral, and the EBITDA leg (0.20x) is dominated by the 3x multiple taken on the
+    // same figure. A business losing money against valuable real estate is the remaining
+    // case — and is exactly the distressed target this pipeline exists to find.
+    //
+    // Hand math: down = 0.50*5,000,000               = 2,500,000  (EBITDA leg dormant)
+    //            high = 3*(-2,000,000) + 5,000,000   = -1,000,000
+    //            2,500,000 > -1,000,000 -> shortfall
     const result = underwriteBusinessListing({
-      ebitda: 50000,
-      include_real_estate: false,
+      ebitda: -2000000,
       real_estate_value: 5000000,
     });
 
     expect(result.downPayment).toBe(2500000);
-    expect(result.offerHigh).toBe(150000);
+    expect(result.offerHigh).toBe(-1000000);
     expect(result.collateralShortfall).toBe(true);
-    expect(result.sellerCarry).toBe(-2350000);
+    expect(result.sellerCarry).toBe(-3500000);
+  });
+
+  test("the include flags move the collateral and the offer together", () => {
+    // WHY: this is the regression. Excluding the real estate used to drop it from the
+    // offer while leaving half its value in the down payment — quoting collateral drawn
+    // from a building that is not in the deal.
+    // Hand math with the real estate out: down = 0.30*500,000 + 0.20*200,000
+    //                                          + 0.20*1,500,000 = 490,000
+    //                                     high = 3*1,500,000 + 500,000 + 200,000
+    //                                          = 5,200,000
+    const result = underwriteBusinessListing({
+      ebitda: "1500000",
+      ff_e_value: "500000",
+      include_real_estate: false,
+      inventory_value: "200000",
+      real_estate_value: "3000000",
+    });
+
+    expect(result.downPayment).toBe(490000);
+    expect(result.legs.realEstate).toBe(0);
+    expect(result.assetsIncluded).toBe(700000);
+    expect(result.offerHigh).toBe(5200000);
+  });
+
+  test("terms price the deal at the offer made, while sellerCarry stays the ceiling", () => {
+    // WHY: the range and the deal are different numbers and an LOI must quote the deal.
+    // sellerCarry is the carry at offerHigh; terms.sellerFinanced is the carry at the
+    // price actually offered. Conflating them would put the ceiling on the letter.
+    // Hand math: down  = 0.50*3,000,000 + 0.20*1,500,000 = 1,800,000
+    //            high  = 3*1,500,000 + 3,000,000         = 7,500,000
+    //            carry = 7,500,000 - 1,800,000           = 5,700,000
+    //            terms = 5,000,000 - 1,800,000           = 3,200,000
+    const result = underwriteBusinessListing({
+      balloon_length: 7,
+      ebitda: "1500000",
+      price_offered: "5000000",
+      real_estate_value: "3000000",
+      seller_amortization: 30,
+      seller_fi_rate: 0,
+    });
+
+    expect(result.downPayment).toBe(1800000);
+    expect(result.sellerCarry).toBe(5700000);
+    expect(result.priceOffered).toBe(5000000);
+    expect(result.terms.sellerFinanced).toBe(3200000);
+    // 3,200,000 / 360 = 8,888.88; balloon 3,200,000 * (360-84)/360 = 2,453,333.33
+    expect(result.terms.sfPayment).toBeCloseTo(8888.888889, 4);
+    expect(result.terms.balloonBalance).toBeCloseTo(2453333.333333, 4);
+  });
+
+  test("leaves the terms null until a price is offered", () => {
+    // WHY: an imported listing has a range and no chosen price. The LOI must not be able
+    // to render $0 terms as though they were agreed.
+    const result = underwriteBusinessListing({ ebitda: "1500000", real_estate_value: "3000000" });
+
+    expect(result.priceOffered).toBe(null);
+    expect(result.terms.sellerFinanced).toBe(null);
+    expect(result.terms.sfPayment).toBe(null);
   });
 
   test("carries a stored earnings_source rather than re-deriving it", () => {

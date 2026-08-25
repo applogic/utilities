@@ -35,6 +35,7 @@ export {
   BUSINESS_UNDERWRITING_CONSTANTS,
   calculateBusinessDownPayment,
   calculateBusinessOffer,
+  calculateBusinessSellerFinance,
   resolveBusinessEarnings,
   shouldIncludeRealEstate,
   underwriteBusinessListing,

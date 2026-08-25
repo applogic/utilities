@@ -6,6 +6,9 @@
 // convey with it. Shared by the BizBuySell extension panel and the dashboard so
 // both quote the same numbers from the same inputs.
 
+import { FINANCIAL_CONSTANTS } from "../config/financial.js";
+import { calculateBalloonBalance, calculatePMT } from "./calculations.js";
+
 /**
  * Collateral advance rates for the down payment, and the earnings multiples
  * bounding the offer. The EBITDA leg only contributes at or above its threshold
@@ -91,11 +94,27 @@ export function shouldIncludeRealEstate(inputs = {}) {
  * $1M. Each leg is capped at its own rate, and a leg with no reported value
  * contributes nothing.
  *
+ * The include flags gate the legs, because they gate the offer: an asset that is
+ * not being bought cannot secure the down payment for the purchase. Without this
+ * the two halves of the underwrite disagree — excluding the real estate would drop
+ * it from the offer while still counting half its value as collateral, quoting a
+ * down payment backed by a building that is not in the deal.
+ *
  * The EBITDA leg reads EBITDA specifically, not the coalesced earnings figure —
  * an SDE-only listing does not qualify, because SDE includes owner compensation
- * and is not the same measure the threshold was set against.
+ * and is not the same measure the threshold was set against. Its flag governs
+ * collateral only; EBITDA is the base the offer multiple is taken against, so
+ * adding it to the offer range as well would quote 4x while reporting 3x.
  *
- * @param {{realEstateValue?:number, ffeValue?:number, inventoryValue?:number, ebitda?:number}} inputs
+ * @param {object} inputs
+ * @param {number} [inputs.realEstateValue]
+ * @param {number} [inputs.ffeValue]
+ * @param {number} [inputs.inventoryValue]
+ * @param {number} [inputs.ebitda]
+ * @param {boolean} [inputs.includeRealEstate=true]
+ * @param {boolean} [inputs.includeFfe=true]
+ * @param {boolean} [inputs.includeInventory=true]
+ * @param {boolean} [inputs.includeEbitda=true]
  * @returns {{downPayment:number, legs:{realEstate:number, ffe:number, inventory:number, ebitda:number}}}
  */
 export function calculateBusinessDownPayment(inputs = {}) {
@@ -107,10 +126,17 @@ export function calculateBusinessDownPayment(inputs = {}) {
     REAL_ESTATE_ADVANCE_RATE,
   } = BUSINESS_UNDERWRITING_CONSTANTS;
 
-  const realEstateValue = toNonNegative(inputs.realEstateValue) ?? 0;
-  const ffeValue = toNonNegative(inputs.ffeValue) ?? 0;
-  const inventoryValue = toNonNegative(inputs.inventoryValue) ?? 0;
-  const ebitda = toNumber(inputs.ebitda) ?? 0;
+  const {
+    includeEbitda = true,
+    includeFfe = true,
+    includeInventory = true,
+    includeRealEstate = true,
+  } = inputs;
+
+  const realEstateValue = includeRealEstate ? toNonNegative(inputs.realEstateValue) ?? 0 : 0;
+  const ffeValue = includeFfe ? toNonNegative(inputs.ffeValue) ?? 0 : 0;
+  const inventoryValue = includeInventory ? toNonNegative(inputs.inventoryValue) ?? 0 : 0;
+  const ebitda = includeEbitda ? toNumber(inputs.ebitda) ?? 0 : 0;
 
   const legs = {
     ebitda: ebitda >= EBITDA_ADVANCE_THRESHOLD ? ebitda * EBITDA_ADVANCE_RATE : 0,
@@ -170,6 +196,82 @@ export function calculateBusinessOffer(inputs = {}) {
 }
 
 /**
+ * The seller-carry terms for the price actually being offered.
+ *
+ * The offer range is a range; the LOI needs one number. priceOffered is that
+ * choice, and the seller carries whatever the collateral down payment does not
+ * cover. From there the arithmetic is the property engine's, so both sides quote
+ * a balloon identically — a business is worked like a rental, only the earnings
+ * measure differs.
+ *
+ * Returns nulls when no price has been offered yet. A zeroed payment schedule
+ * would read as real terms on an LOI, which is the more damaging error.
+ *
+ * @param {object} inputs
+ * @param {number} inputs.priceOffered - The figure being offered
+ * @param {number} inputs.downPayment - Collateral-derived down payment
+ * @param {number} [inputs.interestRate=0] - Annual seller-finance rate, as a decimal
+ * @param {number} [inputs.amortizationYears=30]
+ * @param {number} [inputs.balloonYears=7]
+ * @param {string} [inputs.interestPaymentMode="standard"] - standard | simple_payout | compound_payout
+ * @returns {{sellerFinanced:number|null, sfPayment:number|null, balloonBalance:number|null, performancePayout:number, totalPayments:number|null}}
+ */
+export function calculateBusinessSellerFinance(inputs = {}) {
+  const {
+    amortizationYears = FINANCIAL_CONSTANTS.SELLER_FI_AMORTIZATION,
+    balloonYears = FINANCIAL_CONSTANTS.DEFAULT_BALLOON_PERIOD_YEARS,
+    interestPaymentMode = "standard",
+    interestRate = FINANCIAL_CONSTANTS.SELLER_FI_INTEREST_RATE,
+  } = inputs;
+
+  const priceOffered = toNumber(inputs.priceOffered);
+  if (priceOffered === null) {
+    return {
+      balloonBalance: null,
+      performancePayout: 0,
+      sellerFinanced: null,
+      sfPayment: null,
+      totalPayments: null,
+    };
+  }
+
+  const downPayment = toNonNegative(inputs.downPayment) ?? 0;
+  // Never negative: collateral outrunning the offer is reported as a shortfall by
+  // the caller, not folded back in here as a carry the seller owes the buyer.
+  const sellerFinanced = Math.max(0, priceOffered - downPayment);
+
+  let performancePayout = 0;
+  let sfPayment;
+
+  if (interestPaymentMode === "standard") {
+    sfPayment = calculatePMT(sellerFinanced, interestRate, amortizationYears);
+  } else {
+    // Payout modes defer all interest to the balloon, so the running payment is
+    // principal-only and the balloon carries the accrued interest instead.
+    sfPayment = calculatePMT(sellerFinanced, 0, amortizationYears);
+    if (interestPaymentMode === "simple_payout") {
+      performancePayout = sellerFinanced * interestRate * balloonYears;
+    } else if (interestPaymentMode === "compound_payout") {
+      performancePayout = sellerFinanced * (Math.pow(1 + interestRate, balloonYears) - 1);
+    }
+  }
+
+  // Mirrors the property engine: amortized down in standard mode, full principal
+  // in the payout modes, with the deferred interest added on top.
+  const baseBalloonBalance = interestPaymentMode === "standard"
+    ? calculateBalloonBalance(sellerFinanced, interestRate, amortizationYears, balloonYears)
+    : sellerFinanced;
+
+  return {
+    balloonBalance: baseBalloonBalance + performancePayout,
+    performancePayout,
+    sellerFinanced,
+    sfPayment,
+    totalPayments: sfPayment * 12 * balloonYears,
+  };
+}
+
+/**
  * Full underwrite for one listing: resolve earnings, size the down payment from
  * collateral, and bound the offer. The seller carries the balance of the ceiling
  * offer as preferred equity.
@@ -193,9 +295,20 @@ export function underwriteBusinessListing(listing = {}) {
     sde: listing.sde,
   });
 
+  // One set of flags drives both the collateral stack and the offer range, so an
+  // asset excluded from the deal leaves both at once.
+  const includeEbitda = listing.includeEbitda ?? listing.include_ebitda ?? true;
+  const includeFfe = listing.includeFfe ?? listing.include_ff_e ?? true;
+  const includeInventory = listing.includeInventory ?? listing.include_inventory ?? true;
+  const includeRealEstate = listing.includeRealEstate ?? listing.include_real_estate ?? true;
+
   const { downPayment, legs } = calculateBusinessDownPayment({
     ebitda,
     ffeValue,
+    includeEbitda,
+    includeFfe,
+    includeInventory,
+    includeRealEstate,
     inventoryValue,
     realEstateValue,
   });
@@ -203,11 +316,24 @@ export function underwriteBusinessListing(listing = {}) {
   const { assetsIncluded, offerHigh, offerLow } = calculateBusinessOffer({
     earnings,
     ffeValue,
-    includeFfe: listing.includeFfe ?? listing.include_ff_e ?? true,
-    includeInventory: listing.includeInventory ?? listing.include_inventory ?? true,
-    includeRealEstate: listing.includeRealEstate ?? listing.include_real_estate ?? true,
+    includeFfe,
+    includeInventory,
+    includeRealEstate,
     inventoryValue,
     realEstateValue,
+  });
+
+  // Terms for the price actually offered. Kept separate from the range figures
+  // above so there is no mistaking the deal being made for the ceiling that
+  // bounds it — sellerCarry is the carry at offerHigh, terms.sellerFinanced the
+  // carry at the price on the LOI.
+  const terms = calculateBusinessSellerFinance({
+    amortizationYears: listing.sellerAmortization ?? listing.seller_amortization ?? undefined,
+    balloonYears: listing.balloonLength ?? listing.balloon_length ?? undefined,
+    downPayment,
+    interestPaymentMode: listing.interestPaymentMode ?? listing.interest_payment_mode ?? "standard",
+    interestRate: listing.sellerFiRate ?? listing.seller_fi_rate ?? undefined,
+    priceOffered: listing.priceOffered ?? listing.price_offered,
   });
 
   return {
@@ -219,6 +345,8 @@ export function underwriteBusinessListing(listing = {}) {
     legs,
     offerHigh,
     offerLow,
+    priceOffered: toNumber(listing.priceOffered ?? listing.price_offered),
     sellerCarry: offerHigh === null ? null : offerHigh - downPayment,
+    terms,
   };
 }
