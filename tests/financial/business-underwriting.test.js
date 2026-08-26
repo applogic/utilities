@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  calculateBusinessCashFlow,
   calculateBusinessDownPayment,
   calculateBusinessOffer,
   calculateBusinessSellerFinance,
@@ -7,6 +8,7 @@ import {
   shouldIncludeRealEstate,
   underwriteBusinessListing,
 } from "../../src/financial/business-underwriting.js";
+import { calculatePMT } from "../../src/financial/calculations.js";
 
 // Underwriting for businesses backed by real estate. Every expected number below is
 // hand-computed from the model, never read back from the engine, so a wrong model fails
@@ -261,8 +263,9 @@ describe("calculateBusinessSellerFinance", () => {
 describe("calculateBusinessOffer", () => {
   test("brackets the offer at 2x and 3x earnings plus the conveying assets", () => {
     // Hand math: assets = 2,000,000 + 300,000 + 100,000 = 2,400,000
-    //            low  = 2 * 500,000 + 2,400,000 = 3,400,000
-    //            high = 3 * 500,000 + 2,400,000 = 3,900,000
+    //            low  = 2   * 500,000 + 2,400,000 = 3,400,000
+    //            mid  = 2.5 * 500,000 + 2,400,000 = 3,650,000
+    //            high = 3   * 500,000 + 2,400,000 = 3,900,000
     const result = calculateBusinessOffer({
       earnings: 500000,
       ffeValue: 300000,
@@ -270,7 +273,7 @@ describe("calculateBusinessOffer", () => {
       realEstateValue: 2000000,
     });
 
-    expect(result).toEqual({ assetsIncluded: 2400000, offerHigh: 3900000, offerLow: 3400000 });
+    expect(result).toEqual({ assetsIncluded: 2400000, offerHigh: 3900000, offerLow: 3400000, offerMid: 3650000 });
   });
 
   test("drops an asset the listing states is already in the asking price", () => {
@@ -419,5 +422,228 @@ describe("underwriteBusinessListing", () => {
 
     expect(result.earningsSource).toBe("cash_flow");
     expect(result.offerHigh).toBe(900000);
+  });
+});
+
+describe("calculateBusinessOffer — mid multiple", () => {
+  test("offerMid is 2.5x earnings plus the included assets", () => {
+    // WHY: the gate can be run at the middle of the range, so the middle must exist.
+    // Hand math: 2.5 * 500,000 + 3,000,000 = 4,250,000.
+    const result = calculateBusinessOffer({ earnings: 500000, realEstateValue: 3000000 });
+    expect(result.offerMid).toBe(4250000);
+    expect(result.offerLow).toBe(4000000);
+    expect(result.offerHigh).toBe(4500000);
+  });
+
+  test("offerMid is null when there is no earnings figure", () => {
+    expect(calculateBusinessOffer({ realEstateValue: 3000000 }).offerMid).toBe(null);
+  });
+});
+
+describe("calculateBusinessCashFlow", () => {
+  test("an SDE deal installs a manager, services both loans, and clears", () => {
+    // WHY: the whole point of the gate — earnings must cover the DSCR loan (P+I on the
+    // advance) AND the 0% seller carry, AFTER a hired manager, or the deal is not real.
+    // SDE still pays the owner, so the manager comes out of it.
+    //   manager  = clamp(0.125 * 2,000,000, 60K, 120K) = 250,000 -> capped at 120,000
+    //   adjusted = 500,000 - 120,000 = 380,000
+    //   DSCR     = P+I on the 1,500,000 advance at 10% / 25yr
+    //   seller   = (4,500,000 - 1,500,000) principal-only over 60yr = 3,000,000 / 720 /mo
+    //   cashflow = adjusted - DSCR*12 - seller*12   (positive here -> passes)
+    const cf = calculateBusinessCashFlow({
+      askingPrice: 5000000,
+      downPayment: 1500000,
+      earnings: 500000,
+      earningsSource: "sde",
+      grossRevenue: 2000000,
+      offerHigh: 4500000,
+      priceOffered: 4500000,
+    });
+
+    expect(cf.managerCost).toBe(120000);
+    expect(cf.adjustedEarnings).toBe(380000);
+    expect(cf.dscrPaymentMonthly).toBe(calculatePMT(1500000, 0.10, 25));
+    expect(cf.sellerPaymentMonthly).toBeCloseTo(3000000 / 720, 6);
+    expect(cf.cashFlowAnnual).toBeCloseTo(380000 - calculatePMT(1500000, 0.10, 25) * 12 - (3000000 / 720) * 12, 6);
+    expect(cf.marginAnnual).toBeCloseTo(cf.cashFlowAnnual / 4500000, 12);
+    expect(cf.marginMonthly).toBeCloseTo(cf.cashFlowMonthly / 4500000, 12);
+    expect(cf.pass).toBe(true);
+    expect(cf.offerBelowAsking).toBe(true); // 4.5M ceiling < 5M ask -> soft highlight, not a pill
+    expect(cf.pills).toEqual([]);
+  });
+
+  test("EBITDA is used raw (no manager) and the EBITDA advance leg flags cash-flow lending", () => {
+    // WHY: EBITDA is already struck after management, so no manager is deducted; and once
+    // the advance leans on the 0.20*EBITDA leg the deal is financed on cash flow, which the
+    // "EBITDA financed" pill must surface even when it still clears.
+    //   advance  = 0.50*2,000,000 + 0.20*1,500,000 = 1,300,000  (EBITDA leg = 300,000)
+    //   offerHigh= 3*1,500,000 + 2,000,000 = 6,500,000
+    const cf = calculateBusinessCashFlow({
+      downPayment: 1300000,
+      earnings: 1500000,
+      earningsSource: "ebitda",
+      ebitdaLegAmount: 300000,
+      grossRevenue: 4000000,
+      offerHigh: 6500000,
+      priceOffered: 6500000,
+    });
+
+    expect(cf.managerCost).toBe(0);
+    expect(cf.adjustedEarnings).toBe(1500000);
+    expect(cf.ebitdaFinanced).toBe(true);
+    expect(cf.pass).toBe(true);
+    expect(cf.flagged).toBe(true);
+    expect(cf.pills).toEqual(["EBITDA financed"]);
+  });
+
+  test("thin earnings that cannot service the debt fail the gate with a Cash Flow pill", () => {
+    // WHY: the fail path. No revenue reported, so the manager falls to the $60K floor (never
+    // zero), and $100K of SDE cannot carry a $1M DSCR loan plus a $4M seller carry.
+    //   manager  = 60,000 (floor)      adjusted = 40,000
+    const cf = calculateBusinessCashFlow({
+      downPayment: 1000000,
+      earnings: 100000,
+      earningsSource: "sde",
+      offerHigh: 5000000,
+      priceOffered: 5000000,
+    });
+
+    expect(cf.managerCost).toBe(60000);
+    expect(cf.cashFlowAnnual).toBeLessThan(0);
+    expect(cf.pass).toBe(false);
+    expect(cf.pills).toContain("Cash Flow");
+  });
+
+  test("returns null when it cannot be gated — no earnings, or no price", () => {
+    // WHY: an un-underwritable listing has not failed; a zeroed verdict would read as a fail.
+    expect(calculateBusinessCashFlow({ downPayment: 100000, priceOffered: 500000 })).toBe(null);
+    expect(calculateBusinessCashFlow({ downPayment: 100000, earnings: 500000 })).toBe(null);
+  });
+});
+
+describe("underwriteBusinessListing — cash-flow gate", () => {
+  test("attaches the gate priced at the offer ceiling by default", () => {
+    // WHY: the panel shows a range but must gate somewhere; the ceiling is the thinnest
+    // margin, so it is the honest default. Hand math: down = 0.50*3,000,000 = 1,500,000;
+    // offerHigh = 3*500,000 + 3,000,000 = 4,500,000; manager clamps at 120,000.
+    const result = underwriteBusinessListing({
+      gross_revenue: 2000000,
+      real_estate_value: 3000000,
+      sde: 500000,
+    });
+
+    expect(result.offerMid).toBe(4250000);
+    expect(result.offerEnd).toBe("high");
+    expect(result.cashFlow.price).toBe(4500000);
+    expect(result.cashFlow.managerCost).toBe(120000);
+    expect(result.cashFlow.pass).toBe(true);
+  });
+
+  test("offer_end re-gates at the chosen end of the range", () => {
+    // WHY: the panel's high/mid/low toggle. A lower offer is a smaller seller carry and a
+    // fatter margin, so the gated price must actually move with the toggle.
+    const result = underwriteBusinessListing({
+      offer_end: "low",
+      gross_revenue: 2000000,
+      real_estate_value: 3000000,
+      sde: 500000,
+    });
+
+    expect(result.cashFlow.price).toBe(4000000); // offerLow = 2*500,000 + 3,000,000
+  });
+});
+
+describe("calculateBusinessCashFlow — blended rate", () => {
+  test("weights each leg by its share of the stack, not by a simple average", () => {
+    // WHY: the two legs are priced differently and are rarely the same size, so an
+    // unweighted average would flatter a deal carried mostly by the 0% seller.
+    //   advance 1,800,000 @ 10%  +  carry 2,700,000 @ 0%   over 4,500,000 financed
+    //   = 180,000 / 4,500,000 = 4%
+    const cf = calculateBusinessCashFlow({
+      downPayment: 1800000,
+      earnings: 500000,
+      earningsSource: "sde",
+      grossRevenue: 2000000,
+      priceOffered: 4500000,
+    });
+
+    expect(cf.blendedRate).toBeCloseTo(0.04, 10);
+  });
+
+  test("collapses to the DSCR rate when the seller carries nothing", () => {
+    // WHY: the advance is itself borrowed, so a deal the collateral covers end to end is
+    // not an all-cash deal — it is 100% DSCR, and the blend must say 10%, not 0%.
+    const cf = calculateBusinessCashFlow({
+      downPayment: 500000,
+      earnings: 500000,
+      earningsSource: "ebitda",
+      priceOffered: 500000,
+    });
+
+    expect(cf.sellerFinanced).toBe(0);
+    expect(cf.blendedRate).toBeCloseTo(0.1, 10);
+  });
+});
+
+describe("underwriteBusinessListing — down payment override", () => {
+  // Shared fixture: RE 3,000,000, SDE 500,000, revenue 2,000,000, no price offered.
+  //   collateral down = 0.50 * 3,000,000 = 1,500,000
+  //   offerHigh       = 3 * 500,000 + 3,000,000 = 4,500,000  (the gate price)
+  const fixture = {
+    gross_revenue: 2000000,
+    real_estate_value: 3000000,
+    sde: 500000,
+  };
+
+  test("collateral answers when no override is set", () => {
+    const result = underwriteBusinessListing(fixture);
+
+    expect(result.downPayment).toBe(1500000);
+    expect(result.downPaymentSource).toBe("collateral");
+    expect(result.downPaymentPercent).toBeCloseTo(1500000 / 4500000, 10);
+  });
+
+  test("an override replaces the collateral stack and resizes the DSCR loan with it", () => {
+    // WHY: the down payment IS the DSCR principal. An override that moved the down payment
+    // but left the loan at the collateral figure would quote a deal nobody can finance.
+    //   down = 0.40 * 4,500,000 = 1,800,000, so the loan is 1,800,000, not 1,500,000
+    //   dscr annual = 12 * PMT(1,800,000, 10%, 25) = 196,279.36…
+    const result = underwriteBusinessListing({ ...fixture, down_payment_percent: 0.4 });
+
+    expect(result.downPayment).toBe(1800000);
+    expect(result.downPaymentSource).toBe("override");
+    expect(result.cashFlow.dscrPaymentAnnual).toBeCloseTo(calculatePMT(1800000, 0.1, 25) * 12, 6);
+    expect(result.sellerCarry).toBe(2700000); // 4,500,000 − 1,800,000
+  });
+
+  test("keeps reporting what the collateral would have advanced", () => {
+    // WHY: the legs are the check on the override. Losing them would hide that the assets
+    // only support 1,500,000 of the 1,800,000 being put down.
+    const result = underwriteBusinessListing({ ...fixture, down_payment_percent: 0.4 });
+
+    expect(result.collateralDownPayment).toBe(1500000);
+    expect(result.legs.realEstate).toBe(1500000);
+  });
+
+  test("takes its percentage of the price offered once there is one", () => {
+    // WHY: the LOI price is the deal being made; a down payment struck against the ceiling
+    // instead would not match the carry the LOI quotes.
+    //   0.25 * 4,000,000 = 1,000,000 down, so the carry at the offered price is 3,000,000
+    const result = underwriteBusinessListing({
+      ...fixture,
+      down_payment_percent: 0.25,
+      price_offered: 4000000,
+    });
+
+    expect(result.downPayment).toBe(1000000);
+    expect(result.terms.sellerFinanced).toBe(3000000);
+  });
+
+  test("a cleared or zeroed override hands the deal back to the collateral", () => {
+    // WHY: emptying the field must restore the collateral answer, never zero the down
+    // payment — a $0 down payment quotes the whole price as seller carry.
+    expect(underwriteBusinessListing({ ...fixture, down_payment_percent: null }).downPayment).toBe(1500000);
+    expect(underwriteBusinessListing({ ...fixture, down_payment_percent: 0 }).downPayment).toBe(1500000);
+    expect(underwriteBusinessListing({ ...fixture, down_payment_percent: "" }).downPayment).toBe(1500000);
   });
 });

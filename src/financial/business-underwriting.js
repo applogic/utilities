@@ -15,13 +15,20 @@ import { calculateBalloonBalance, calculatePMT } from "./calculations.js";
  * — smaller earnings are not treated as collateral.
  */
 export const BUSINESS_UNDERWRITING_CONSTANTS = {
+  DSCR_AMORTIZATION_YEARS: 25,
+  DSCR_INTEREST_RATE: 0.10,
   EBITDA_ADVANCE_RATE: 0.20,
   EBITDA_ADVANCE_THRESHOLD: 1000000,
   FF_E_ADVANCE_RATE: 0.30,
   INVENTORY_ADVANCE_RATE: 0.20,
+  MANAGER_CEILING: 120000,
+  MANAGER_FLOOR: 60000,
+  MANAGER_RATE: 0.125,
   OFFER_MULTIPLE_HIGH: 3,
   OFFER_MULTIPLE_LOW: 2,
+  OFFER_MULTIPLE_MID: 2.5,
   REAL_ESTATE_ADVANCE_RATE: 0.50,
+  SELLER_AMORTIZATION_YEARS: 60,
 };
 
 // Coerce a scraped/stored figure to a finite number, else null. Absent data must
@@ -164,10 +171,10 @@ export function calculateBusinessDownPayment(inputs = {}) {
  * @param {boolean} [inputs.includeRealEstate=true]
  * @param {boolean} [inputs.includeFfe=true]
  * @param {boolean} [inputs.includeInventory=true]
- * @returns {{assetsIncluded:number, offerHigh:number|null, offerLow:number|null}}
+ * @returns {{assetsIncluded:number, offerHigh:number|null, offerLow:number|null, offerMid:number|null}}
  */
 export function calculateBusinessOffer(inputs = {}) {
-  const { OFFER_MULTIPLE_HIGH, OFFER_MULTIPLE_LOW } = BUSINESS_UNDERWRITING_CONSTANTS;
+  const { OFFER_MULTIPLE_HIGH, OFFER_MULTIPLE_LOW, OFFER_MULTIPLE_MID } = BUSINESS_UNDERWRITING_CONSTANTS;
 
   const {
     includeFfe = true,
@@ -181,12 +188,13 @@ export function calculateBusinessOffer(inputs = {}) {
     (includeInventory ? toNonNegative(inputs.inventoryValue) ?? 0 : 0);
 
   const earnings = toNumber(inputs.earnings);
-  if (earnings === null) return { assetsIncluded, offerHigh: null, offerLow: null };
+  if (earnings === null) return { assetsIncluded, offerHigh: null, offerLow: null, offerMid: null };
 
   return {
     assetsIncluded,
     offerHigh: earnings * OFFER_MULTIPLE_HIGH + assetsIncluded,
     offerLow: earnings * OFFER_MULTIPLE_LOW + assetsIncluded,
+    offerMid: earnings * OFFER_MULTIPLE_MID + assetsIncluded,
   };
 }
 
@@ -267,6 +275,136 @@ export function calculateBusinessSellerFinance(inputs = {}) {
 }
 
 /**
+ * The debt-service gate. Does the business's earnings cover both loans it is bought
+ * with, after a professional manager is installed?
+ *
+ * Two legs, each priced the way the deal is actually financed:
+ *   - DSCR loan: principal + interest on the collateral advance (the down payment),
+ *     amortized at the commercial rate/term. This is real money out every month.
+ *   - Seller carry: principal only (0%), spread over the business carry term. The
+ *     seller finances whatever the advance did not cover.
+ *
+ * The manager is the reason EBITDA and SDE are not interchangeable here. EBITDA is
+ * already struck after management, so it is used as-is. SDE (and the SDE-shaped
+ * "cash flow" figure most listings publish) still pays the owner, so a hired
+ * manager's cost comes out first — 12.5% of revenue, floored at $60K so a tiny
+ * business still budgets a real salary and capped at $120K so a large one does not
+ * hand the whole upside to a GM.
+ *
+ * margin is that leftover cash flow over the price offered — the honest efficiency
+ * metric, because this structure puts no buyer cash in and cash-on-cash is infinite.
+ *
+ * Returns null when there is no earnings figure or no price to gate: a zeroed
+ * verdict would read as "fails", and a business with no published earnings has not
+ * failed, it is simply un-underwritable until a figure exists.
+ *
+ * @param {object} inputs
+ * @param {number} inputs.earnings - Annual earnings the deal is bought on
+ * @param {string|null} inputs.earningsSource - "ebitda" | "sde" | "cash_flow" | null
+ * @param {number} inputs.downPayment - Collateral advance = the DSCR loan principal
+ * @param {number} inputs.priceOffered - The offer being gated (its seller carry = price − advance)
+ * @param {number} [inputs.grossRevenue] - Drives the manager cost on non-EBITDA earnings
+ * @param {number} [inputs.ebitdaLegAmount=0] - The EBITDA slice of the advance; > 0 flags cash-flow lending
+ * @param {number} [inputs.offerHigh] - Ceiling offer, for the below-asking highlight
+ * @param {number} [inputs.askingPrice] - For the below-asking highlight
+ * @param {number} [inputs.dscrRate] - DSCR annual rate (default 10%)
+ * @param {number} [inputs.dscrAmortizationYears] - DSCR term (default 25)
+ * @param {number} [inputs.sellerAmortizationYears] - Seller carry term (default 60)
+ * @param {number} [inputs.sellerRate] - Seller carry rate (default 0%)
+ * @param {number} [inputs.balloonYears] - Seller carry balloon (default from FINANCIAL_CONSTANTS)
+ * @returns {object|null} manager cost, both leg payments, blended rate, cash flow + margin (monthly/annual), pass, pills
+ */
+export function calculateBusinessCashFlow(inputs = {}) {
+  const {
+    DSCR_AMORTIZATION_YEARS,
+    DSCR_INTEREST_RATE,
+    MANAGER_CEILING,
+    MANAGER_FLOOR,
+    MANAGER_RATE,
+    SELLER_AMORTIZATION_YEARS,
+  } = BUSINESS_UNDERWRITING_CONSTANTS;
+
+  const {
+    askingPrice = null,
+    balloonYears = FINANCIAL_CONSTANTS.DEFAULT_BALLOON_PERIOD_YEARS,
+    dscrAmortizationYears = DSCR_AMORTIZATION_YEARS,
+    dscrRate = DSCR_INTEREST_RATE,
+    earningsSource = null,
+    ebitdaLegAmount = 0,
+    offerHigh = null,
+    sellerAmortizationYears = SELLER_AMORTIZATION_YEARS,
+    sellerRate = FINANCIAL_CONSTANTS.SELLER_FI_INTEREST_RATE,
+  } = inputs;
+
+  const price = toNumber(inputs.priceOffered);
+  const earnings = toNumber(inputs.earnings);
+  if (price === null || price <= 0 || earnings === null) return null;
+
+  const advance = toNonNegative(inputs.downPayment) ?? 0;
+
+  // EBITDA is already net of a manager; everything else still pays the owner, so the
+  // manager comes out first. No revenue reported falls to the floor, never to zero.
+  const managerCost =
+    earningsSource === "ebitda"
+      ? 0
+      : Math.min(MANAGER_CEILING, Math.max(MANAGER_FLOOR, (toNonNegative(inputs.grossRevenue) ?? 0) * MANAGER_RATE));
+  const adjustedEarnings = earnings - managerCost;
+
+  const dscrPaymentMonthly = calculatePMT(advance, dscrRate, dscrAmortizationYears);
+  const { sfPayment: sellerPaymentMonthly, sellerFinanced } = calculateBusinessSellerFinance({
+    amortizationYears: sellerAmortizationYears,
+    balloonYears,
+    downPayment: advance,
+    interestRate: sellerRate,
+    priceOffered: price,
+  });
+
+  const dscrPaymentAnnual = dscrPaymentMonthly * 12;
+  const sellerPaymentAnnual = sellerPaymentMonthly * 12;
+
+  // What the whole capital stack costs, weighted by how much of it each leg is. The
+  // property engine blends the same two rates the same way, so a business and a rental
+  // quote a comparable number.
+  const financed = advance + (sellerFinanced ?? 0);
+  const blendedRate = financed > 0 ? (advance * dscrRate + (sellerFinanced ?? 0) * sellerRate) / financed : 0;
+  const cashFlowAnnual = adjustedEarnings - dscrPaymentAnnual - sellerPaymentAnnual;
+  const cashFlowMonthly = cashFlowAnnual / 12;
+
+  const pass = cashFlowAnnual >= 0;
+  const ebitdaFinanced = (toNonNegative(ebitdaLegAmount) ?? 0) > 0;
+  const ceiling = toNumber(offerHigh);
+  const asking = toNumber(askingPrice);
+  const offerBelowAsking = ceiling !== null && asking !== null && asking > 0 && ceiling < asking;
+
+  // Red flags, most damaging first. offerBelowAsking is a separate soft highlight,
+  // not a pill — it does not disqualify the deal, it just says come in under asking.
+  const pills = [];
+  if (!pass) pills.push("Cash Flow");
+  if (ebitdaFinanced) pills.push("EBITDA financed");
+
+  return {
+    adjustedEarnings,
+    blendedRate,
+    cashFlowAnnual,
+    cashFlowMonthly,
+    dscrPaymentAnnual,
+    dscrPaymentMonthly,
+    ebitdaFinanced,
+    flagged: !pass || ebitdaFinanced,
+    managerCost,
+    marginAnnual: cashFlowAnnual / price,
+    marginMonthly: cashFlowMonthly / price,
+    offerBelowAsking,
+    pass,
+    pills,
+    price,
+    sellerFinanced,
+    sellerPaymentAnnual,
+    sellerPaymentMonthly,
+  };
+}
+
+/**
  * Full underwrite for one listing: resolve earnings, size the down payment from
  * collateral, and bound the offer. The seller carries the balance of the ceiling
  * offer as preferred equity.
@@ -275,8 +413,12 @@ export function calculateBusinessSellerFinance(inputs = {}) {
  * offer itself — a real signal that the asset value has outrun what the earnings
  * multiple justifies. It is surfaced, never clamped away.
  *
+ * downPaymentPercent lets an analyst answer the collateral back: set it and the down
+ * payment is that share of the price instead of the sum of the advances.
+ *
  * @param {object} listing - Scraped/stored figures (snake_case or camelCase)
- * @returns {object} earnings, earningsSource, downPayment, legs, offerLow, offerHigh, sellerCarry, collateralShortfall
+ * @param {number} [listing.downPaymentPercent] - Decimal share of the price to put down, overriding collateral
+ * @returns {object} earnings, earningsSource, downPayment, downPaymentPercent, downPaymentSource, collateralDownPayment, legs, offerLow, offerHigh, sellerCarry, collateralShortfall
  */
 export function underwriteBusinessListing(listing = {}) {
   const realEstateValue = listing.realEstateValue ?? listing.real_estate_value;
@@ -293,7 +435,7 @@ export function underwriteBusinessListing(listing = {}) {
   // The collateral stack covers everything being acquired, so it takes no include_*
   // flag — those govern only what is ADDED to the offer range. Its one switch is
   // collateralizeEbitda, which has no offer-range counterpart.
-  const { downPayment, legs } = calculateBusinessDownPayment({
+  const { downPayment: collateralDownPayment, legs } = calculateBusinessDownPayment({
     collateralizeEbitda: listing.collateralizeEbitda ?? listing.collateralize_ebitda ?? true,
     ebitda,
     ffeValue,
@@ -301,7 +443,7 @@ export function underwriteBusinessListing(listing = {}) {
     realEstateValue,
   });
 
-  const { assetsIncluded, offerHigh, offerLow } = calculateBusinessOffer({
+  const { assetsIncluded, offerHigh, offerLow, offerMid } = calculateBusinessOffer({
     earnings,
     ffeValue,
     includeFfe: listing.includeFfe ?? listing.include_ff_e ?? true,
@@ -310,6 +452,25 @@ export function underwriteBusinessListing(listing = {}) {
     inventoryValue,
     realEstateValue,
   });
+
+  const earningsSource = listing.earningsSource ?? listing.earnings_source ?? source;
+
+  // The price every derived figure is struck against: the LOI price when one has been
+  // chosen, otherwise the end of the range being looked at (the ceiling by default,
+  // which is the thinnest margin).
+  const offerEnd = listing.offerEnd ?? listing.offer_end ?? "high";
+  const explicitPrice = toNumber(listing.priceOffered ?? listing.price_offered);
+  const gatePrice =
+    explicitPrice ?? { high: offerHigh, low: offerLow, mid: offerMid }[offerEnd] ?? offerHigh;
+
+  // A hand-set down payment percentage replaces the collateral stack for this listing.
+  // The legs are still returned — they explain what the assets would have advanced — but
+  // they stop sizing the deal: the down payment IS the DSCR loan principal, so an override
+  // moves the loan, the seller carry, and the cash-flow gate with it. Cleared, the
+  // collateral answers again.
+  const overridePercent = toNumber(listing.downPaymentPercent ?? listing.down_payment_percent);
+  const hasOverride = overridePercent !== null && overridePercent > 0 && gatePrice !== null;
+  const downPayment = hasOverride ? gatePrice * overridePercent : collateralDownPayment;
 
   // Terms for the price actually offered. Kept separate from the range figures
   // above so there is no mistaking the deal being made for the ceiling that
@@ -324,15 +485,33 @@ export function underwriteBusinessListing(listing = {}) {
     priceOffered: listing.priceOffered ?? listing.price_offered,
   });
 
-  return {
-    assetsIncluded,
-    collateralShortfall: offerHigh !== null && downPayment > offerHigh,
+  // The debt-service gate, priced at gatePrice above.
+  const cashFlow = calculateBusinessCashFlow({
+    askingPrice: listing.askingPrice ?? listing.asking_price,
     downPayment,
     earnings,
-    earningsSource: listing.earningsSource ?? listing.earnings_source ?? source,
+    earningsSource,
+    ebitdaLegAmount: legs.ebitda,
+    grossRevenue: listing.grossRevenue ?? listing.gross_revenue,
+    offerHigh,
+    priceOffered: gatePrice,
+  });
+
+  return {
+    assetsIncluded,
+    cashFlow,
+    collateralDownPayment,
+    collateralShortfall: offerHigh !== null && downPayment > offerHigh,
+    downPayment,
+    downPaymentPercent: gatePrice ? downPayment / gatePrice : null,
+    downPaymentSource: hasOverride ? "override" : "collateral",
+    earnings,
+    earningsSource,
     legs,
+    offerEnd,
     offerHigh,
     offerLow,
+    offerMid,
     priceOffered: toNumber(listing.priceOffered ?? listing.price_offered),
     sellerCarry: offerHigh === null ? null : offerHigh - downPayment,
     terms,

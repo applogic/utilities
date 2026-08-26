@@ -33,6 +33,7 @@ export { EQUITY_CARRY_TIERS, calculateEquityCarryScore } from "./financial/equit
 // Business-backed-by-real-estate underwriting (pure; offer range + collateral down payment)
 export {
   BUSINESS_UNDERWRITING_CONSTANTS,
+  calculateBusinessCashFlow,
   calculateBusinessDownPayment,
   calculateBusinessOffer,
   calculateBusinessSellerFinance,
