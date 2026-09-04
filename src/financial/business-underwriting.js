@@ -15,6 +15,7 @@ import { calculateBalloonBalance, calculatePMT } from "./calculations.js";
  * — smaller earnings are not treated as collateral.
  */
 export const BUSINESS_UNDERWRITING_CONSTANTS = {
+  BALLOON_YEARS: 10,
   DSCR_AMORTIZATION_YEARS: 25,
   DSCR_INTEREST_RATE: 0.10,
   EBITDA_ADVANCE_RATE: 0.20,
@@ -214,15 +215,15 @@ export function calculateBusinessOffer(inputs = {}) {
  * @param {number} inputs.priceOffered - The figure being offered
  * @param {number} inputs.downPayment - Collateral-derived down payment
  * @param {number} [inputs.interestRate=0] - Annual seller-finance rate, as a decimal
- * @param {number} [inputs.amortizationYears=30]
- * @param {number} [inputs.balloonYears=7]
+ * @param {number} [inputs.amortizationYears=60] - Business carry term; the years actually used come back on the result
+ * @param {number} [inputs.balloonYears=10] - Business balloon; the years actually used come back on the result
  * @param {string} [inputs.interestPaymentMode="standard"] - standard | simple_payout | compound_payout
- * @returns {{sellerFinanced:number|null, sfPayment:number|null, balloonBalance:number|null, performancePayout:number, totalPayments:number|null}}
+ * @returns {{amortizationYears:number, balloonYears:number, sellerFinanced:number|null, sfPayment:number|null, balloonBalance:number|null, performancePayout:number, totalPayments:number|null}}
  */
 export function calculateBusinessSellerFinance(inputs = {}) {
   const {
-    amortizationYears = FINANCIAL_CONSTANTS.SELLER_FI_AMORTIZATION,
-    balloonYears = FINANCIAL_CONSTANTS.DEFAULT_BALLOON_PERIOD_YEARS,
+    amortizationYears = BUSINESS_UNDERWRITING_CONSTANTS.SELLER_AMORTIZATION_YEARS,
+    balloonYears = BUSINESS_UNDERWRITING_CONSTANTS.BALLOON_YEARS,
     interestPaymentMode = "standard",
     interestRate = FINANCIAL_CONSTANTS.SELLER_FI_INTEREST_RATE,
   } = inputs;
@@ -230,7 +231,9 @@ export function calculateBusinessSellerFinance(inputs = {}) {
   const priceOffered = toNumber(inputs.priceOffered);
   if (priceOffered === null) {
     return {
+      amortizationYears,
       balloonBalance: null,
+      balloonYears,
       performancePayout: 0,
       sellerFinanced: null,
       sfPayment: null,
@@ -266,7 +269,9 @@ export function calculateBusinessSellerFinance(inputs = {}) {
     : sellerFinanced;
 
   return {
+    amortizationYears,
     balloonBalance: baseBalloonBalance + performancePayout,
+    balloonYears,
     performancePayout,
     sellerFinanced,
     sfPayment,
@@ -311,11 +316,12 @@ export function calculateBusinessSellerFinance(inputs = {}) {
  * @param {number} [inputs.dscrAmortizationYears] - DSCR term (default 25)
  * @param {number} [inputs.sellerAmortizationYears] - Seller carry term (default 60)
  * @param {number} [inputs.sellerRate] - Seller carry rate (default 0%)
- * @param {number} [inputs.balloonYears] - Seller carry balloon (default from FINANCIAL_CONSTANTS)
+ * @param {number} [inputs.balloonYears] - Seller carry balloon (default from BUSINESS_UNDERWRITING_CONSTANTS)
  * @returns {object|null} manager cost, both leg payments, blended rate, cash flow + margin (monthly/annual), pass, pills
  */
 export function calculateBusinessCashFlow(inputs = {}) {
   const {
+    BALLOON_YEARS,
     DSCR_AMORTIZATION_YEARS,
     DSCR_INTEREST_RATE,
     MANAGER_CEILING,
@@ -326,7 +332,7 @@ export function calculateBusinessCashFlow(inputs = {}) {
 
   const {
     askingPrice = null,
-    balloonYears = FINANCIAL_CONSTANTS.DEFAULT_BALLOON_PERIOD_YEARS,
+    balloonYears = BALLOON_YEARS,
     dscrAmortizationYears = DSCR_AMORTIZATION_YEARS,
     dscrRate = DSCR_INTEREST_RATE,
     earningsSource = null,
@@ -456,9 +462,10 @@ export function underwriteBusinessListing(listing = {}) {
   const earningsSource = listing.earningsSource ?? listing.earnings_source ?? source;
 
   // The price every derived figure is struck against: the LOI price when one has been
-  // chosen, otherwise the end of the range being looked at (the ceiling by default,
-  // which is the thinnest margin).
-  const offerEnd = listing.offerEnd ?? listing.offer_end ?? "high";
+  // chosen, otherwise the end of the range being looked at. The floor is the default —
+  // it is the offer actually made, and the ceiling is available on the selector when the
+  // deal wants stressing at the thinnest margin.
+  const offerEnd = listing.offerEnd ?? listing.offer_end ?? "low";
   const explicitPrice = toNumber(listing.priceOffered ?? listing.price_offered);
   const gatePrice =
     explicitPrice ?? { high: offerHigh, low: offerLow, mid: offerMid }[offerEnd] ?? offerHigh;
@@ -472,17 +479,17 @@ export function underwriteBusinessListing(listing = {}) {
   const hasOverride = overridePercent !== null && overridePercent > 0 && gatePrice !== null;
   const downPayment = hasOverride ? gatePrice * overridePercent : collateralDownPayment;
 
-  // Terms for the price actually offered. Kept separate from the range figures
-  // above so there is no mistaking the deal being made for the ceiling that
-  // bounds it — sellerCarry is the carry at offerHigh, terms.sellerFinanced the
-  // carry at the price on the LOI.
+  // Terms for the price being offered — gatePrice, so the whole quote moves together
+  // when the selector moves. Kept separate from the range figures above so there is no
+  // mistaking the deal being made for the ceiling that bounds it: sellerCarry is the
+  // carry at offerHigh, terms.sellerFinanced the carry at the price on the LOI.
   const terms = calculateBusinessSellerFinance({
     amortizationYears: listing.sellerAmortization ?? listing.seller_amortization ?? undefined,
     balloonYears: listing.balloonLength ?? listing.balloon_length ?? undefined,
     downPayment,
     interestPaymentMode: listing.interestPaymentMode ?? listing.interest_payment_mode ?? "standard",
     interestRate: listing.sellerFiRate ?? listing.seller_fi_rate ?? undefined,
-    priceOffered: listing.priceOffered ?? listing.price_offered,
+    priceOffered: gatePrice,
   });
 
   // The debt-service gate, priced at gatePrice above.
@@ -512,7 +519,8 @@ export function underwriteBusinessListing(listing = {}) {
     offerHigh,
     offerLow,
     offerMid,
-    priceOffered: toNumber(listing.priceOffered ?? listing.price_offered),
+    priceOffered: gatePrice,
+    priceOfferedSource: explicitPrice === null ? "range" : "offered",
     sellerCarry: offerHigh === null ? null : offerHigh - downPayment,
     terms,
   };

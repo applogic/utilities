@@ -239,7 +239,9 @@ describe("calculateBusinessSellerFinance", () => {
     // would render on an LOI as real terms — $0 payments against a $0 balloon — so the
     // absence of a chosen price has to stay visible instead of collapsing to zero.
     expect(calculateBusinessSellerFinance({ downPayment: 2000000 })).toEqual({
+      amortizationYears: 60,
       balloonBalance: null,
+      balloonYears: 10,
       performancePayout: 0,
       sellerFinanced: null,
       sfPayment: null,
@@ -399,20 +401,55 @@ describe("underwriteBusinessListing", () => {
     expect(result.downPayment).toBe(1800000);
     expect(result.sellerCarry).toBe(5700000);
     expect(result.priceOffered).toBe(5000000);
+    expect(result.priceOfferedSource).toBe("offered");
     expect(result.terms.sellerFinanced).toBe(3200000);
     // 3,200,000 / 360 = 8,888.88; balloon 3,200,000 * (360-84)/360 = 2,453,333.33
     expect(result.terms.sfPayment).toBeCloseTo(8888.888889, 4);
     expect(result.terms.balloonBalance).toBeCloseTo(2453333.333333, 4);
   });
 
-  test("leaves the terms null until a price is offered", () => {
-    // WHY: an imported listing has a range and no chosen price. The LOI must not be able
-    // to render $0 terms as though they were agreed.
+  test("quotes the floor of the range until a price is offered, and says the price is derived", () => {
+    // WHY: an imported listing has a range and no chosen price. Quoting $0 terms reads as
+    // a deal on $0; quoting the floor reads as the offer that would be made. The source
+    // flag is what keeps an LOI from treating a price nobody chose as one that was agreed.
+    // Hand math: down = 0.50*3,000,000 + 0.20*1,500,000 = 1,800,000
+    //            low  = 2*1,500,000 + 3,000,000         = 6,000,000
+    //            carry= 6,000,000 - 1,800,000           = 4,200,000
     const result = underwriteBusinessListing({ ebitda: "1500000", real_estate_value: "3000000" });
 
-    expect(result.priceOffered).toBe(null);
-    expect(result.terms.sellerFinanced).toBe(null);
-    expect(result.terms.sfPayment).toBe(null);
+    expect(result.priceOffered).toBe(6000000);
+    expect(result.priceOfferedSource).toBe("range");
+    expect(result.terms.sellerFinanced).toBe(4200000);
+    // At the business defaults — a 60-year carry, a 10-year balloon, 0%:
+    //   payment = 4,200,000 / 720           =     5,833.33
+    //   balloon = 4,200,000 * (720-120)/720 = 3,500,000
+    expect(result.terms.sfPayment).toBeCloseTo(5833.333333, 4);
+    expect(result.terms.amortizationYears).toBe(60);
+    expect(result.terms.balloonYears).toBe(10);
+    expect(result.terms.balloonBalance).toBe(3500000);
+  });
+
+  test("an unset balloon underwrites at ten years, not the property engine's seven", () => {
+    // WHY: a business carry is quoted over a longer horizon than a rental's, and a listing
+    // that never had a balloon typed into it must still quote the business term.
+    const stored = underwriteBusinessListing({
+      balloon_length: 7,
+      ebitda: 1500000,
+      price_offered: 6000000,
+      real_estate_value: 3000000,
+    });
+    const unset = underwriteBusinessListing({
+      ebitda: 1500000,
+      price_offered: 6000000,
+      real_estate_value: 3000000,
+    });
+
+    expect(stored.terms.balloonYears).toBe(7);
+    expect(unset.terms.balloonYears).toBe(10);
+    // Same carry over the same 60-year term, longer balloon:
+    //   4,200,000 * (720-84)/720 = 3,710,000  vs  * (720-120)/720 = 3,500,000
+    expect(stored.terms.balloonBalance).toBe(3710000);
+    expect(unset.terms.balloonBalance).toBe(3500000);
   });
 
   test("carries a stored earnings_source rather than re-deriving it", () => {
@@ -522,10 +559,11 @@ describe("calculateBusinessCashFlow", () => {
 });
 
 describe("underwriteBusinessListing — cash-flow gate", () => {
-  test("attaches the gate priced at the offer ceiling by default", () => {
-    // WHY: the panel shows a range but must gate somewhere; the ceiling is the thinnest
-    // margin, so it is the honest default. Hand math: down = 0.50*3,000,000 = 1,500,000;
-    // offerHigh = 3*500,000 + 3,000,000 = 4,500,000; manager clamps at 120,000.
+  test("attaches the gate priced at the offer floor by default", () => {
+    // WHY: the panel shows a range but must gate somewhere, and the floor is the offer
+    // actually made — gating anywhere else quotes a deal nobody is proposing. Hand math:
+    // down = 0.50*3,000,000 = 1,500,000; offerLow = 2*500,000 + 3,000,000 = 4,000,000;
+    // manager clamps at 120,000.
     const result = underwriteBusinessListing({
       gross_revenue: 2000000,
       real_estate_value: 3000000,
@@ -533,23 +571,24 @@ describe("underwriteBusinessListing — cash-flow gate", () => {
     });
 
     expect(result.offerMid).toBe(4250000);
-    expect(result.offerEnd).toBe("high");
-    expect(result.cashFlow.price).toBe(4500000);
+    expect(result.offerEnd).toBe("low");
+    expect(result.cashFlow.price).toBe(4000000);
     expect(result.cashFlow.managerCost).toBe(120000);
     expect(result.cashFlow.pass).toBe(true);
   });
 
   test("offer_end re-gates at the chosen end of the range", () => {
-    // WHY: the panel's high/mid/low toggle. A lower offer is a smaller seller carry and a
-    // fatter margin, so the gated price must actually move with the toggle.
+    // WHY: the panel's low/mid/high toggle. A higher offer is a bigger seller carry and a
+    // thinner margin, so the gated price must actually move with the toggle — this is how
+    // a deal gets stressed at the ceiling once it passes at the floor.
     const result = underwriteBusinessListing({
-      offer_end: "low",
+      offer_end: "high",
       gross_revenue: 2000000,
       real_estate_value: 3000000,
       sde: 500000,
     });
 
-    expect(result.cashFlow.price).toBe(4000000); // offerLow = 2*500,000 + 3,000,000
+    expect(result.cashFlow.price).toBe(4500000); // offerHigh = 3*500,000 + 3,000,000
   });
 });
 
@@ -588,7 +627,8 @@ describe("calculateBusinessCashFlow — blended rate", () => {
 describe("underwriteBusinessListing — down payment override", () => {
   // Shared fixture: RE 3,000,000, SDE 500,000, revenue 2,000,000, no price offered.
   //   collateral down = 0.50 * 3,000,000 = 1,500,000
-  //   offerHigh       = 3 * 500,000 + 3,000,000 = 4,500,000  (the gate price)
+  //   offerLow        = 2 * 500,000 + 3,000,000 = 4,000,000  (the gate price by default)
+  //   offerHigh       = 3 * 500,000 + 3,000,000 = 4,500,000  (what sellerCarry is struck at)
   const fixture = {
     gross_revenue: 2000000,
     real_estate_value: 3000000,
@@ -600,20 +640,19 @@ describe("underwriteBusinessListing — down payment override", () => {
 
     expect(result.downPayment).toBe(1500000);
     expect(result.downPaymentSource).toBe("collateral");
-    expect(result.downPaymentPercent).toBeCloseTo(1500000 / 4500000, 10);
+    expect(result.downPaymentPercent).toBeCloseTo(1500000 / 4000000, 10);
   });
 
   test("an override replaces the collateral stack and resizes the DSCR loan with it", () => {
     // WHY: the down payment IS the DSCR principal. An override that moved the down payment
     // but left the loan at the collateral figure would quote a deal nobody can finance.
-    //   down = 0.40 * 4,500,000 = 1,800,000, so the loan is 1,800,000, not 1,500,000
-    //   dscr annual = 12 * PMT(1,800,000, 10%, 25) = 196,279.36…
+    //   down = 0.40 * 4,000,000 = 1,600,000, so the loan is 1,600,000, not 1,500,000
     const result = underwriteBusinessListing({ ...fixture, down_payment_percent: 0.4 });
 
-    expect(result.downPayment).toBe(1800000);
+    expect(result.downPayment).toBe(1600000);
     expect(result.downPaymentSource).toBe("override");
-    expect(result.cashFlow.dscrPaymentAnnual).toBeCloseTo(calculatePMT(1800000, 0.1, 25) * 12, 6);
-    expect(result.sellerCarry).toBe(2700000); // 4,500,000 − 1,800,000
+    expect(result.cashFlow.dscrPaymentAnnual).toBeCloseTo(calculatePMT(1600000, 0.1, 25) * 12, 6);
+    expect(result.sellerCarry).toBe(2900000); // 4,500,000 − 1,600,000
   });
 
   test("keeps reporting what the collateral would have advanced", () => {
