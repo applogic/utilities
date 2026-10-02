@@ -6,28 +6,28 @@ import { BUSINESS_CONSTANTS } from "../../src/config/business.js";
 // Default terms are 0% interest / 30yr amortization / 7yr balloon, so the seller-note
 // annual payment is simply note / 30 and the COCR falls as the down payment rises.
 describe("calculateSellerFinanceOffer", () => {
-  it("caps the down payment at 9.2% when 15% COCR would need more cash", () => {
+  it("caps the down payment at 7% when 15% COCR would need more cash", () => {
     // price 1,000,000, noi 50,000 (5% cap). Solving cocr = 15%:
     //   cf = 50000 - (1,000,000 - 10,000d)/30 = 16,666.67 + 333.33d ; down = 10,000d
-    //   (16,666.67 + 333.33d)/(10,000d) = 0.15 -> d = 14.29% (> 9.2 ceiling) -> cap.
-    // At 9.2% down: note 908,000 ; annual pmt 908,000/30 = 30,266.67 ;
-    //   cf = 50,000 - 30,266.67 = 19,733.33 ; cocr = 19,733.33/92,000 = 21.449%.
+    //   (16,666.67 + 333.33d)/(10,000d) = 0.15 -> d = 14.29% (> 7 ceiling) -> cap.
+    // At 7% down: note 930,000 ; annual pmt 930,000/30 = 31,000 ;
+    //   cf = 50,000 - 31,000 = 19,000 ; cocr = 19,000/70,000 = 27.143%.
     const r = calculateSellerFinanceOffer(50000, 1000000);
     expect(r.solvedDownPercent).toBeCloseTo(14.2857, 2);
-    expect(r.downPercent).toBe(9.2);
+    expect(r.downPercent).toBe(7);
     expect(r.capped).toBe(true);
-    expect(r.downPaymentAmount).toBeCloseTo(92000, 6);
-    expect(r.sellerNoteAmount).toBeCloseTo(908000, 6);
-    expect(r.annualDebtService).toBeCloseTo(30266.67, 1);
-    expect(r.annualCashFlow).toBeCloseTo(19733.33, 1);
-    expect(r.cocr).toBeCloseTo(21.449, 2);
-    expect(r.cashFlowYield).toBeCloseTo(1.9733, 3);
+    expect(r.downPaymentAmount).toBeCloseTo(70000, 6);
+    expect(r.sellerNoteAmount).toBeCloseTo(930000, 6);
+    expect(r.annualDebtService).toBeCloseTo(31000, 1);
+    expect(r.annualCashFlow).toBeCloseTo(19000, 1);
+    expect(r.cocr).toBeCloseTo(27.143, 2);
+    expect(r.cashFlowYield).toBeCloseTo(1.9, 3);
   });
 
-  it("uses the exact 15% COCR down payment when it lands at or below 9.2%", () => {
+  it("uses the exact 15% COCR down payment when it lands at or below 7%", () => {
     // price 1,000,000, noi 40,000 (4% cap). Solving cocr = 15%:
     //   cf = 40,000 - (1,000,000 - 10,000d)/30 = 6,666.67 + 333.33d ; down = 10,000d
-    //   (6,666.67 + 333.33d)/(10,000d) = 0.15 -> d = 5.714% (<= 9.2) -> use solved.
+    //   (6,666.67 + 333.33d)/(10,000d) = 0.15 -> d = 5.714% (<= 7) -> use solved.
     const r = calculateSellerFinanceOffer(40000, 1000000);
     expect(r.solvedDownPercent).toBeCloseTo(5.7143, 2);
     expect(r.downPercent).toBeCloseTo(5.7143, 2);
@@ -36,11 +36,11 @@ describe("calculateSellerFinanceOffer", () => {
   });
 
   it("computes the balloon balance and total payments for the default 7yr / 30yr note", () => {
-    // At 9.2% down: note 908,000 at 0% over 30yr. After 7yr (84 of 360 payments):
-    //   balloon = 908,000 * (360 - 84)/360 = 696,133.33 ; total paid = 30,266.67 * 7.
+    // At 7% down: note 930,000 at 0% over 30yr. After 7yr (84 of 360 payments):
+    //   balloon = 930,000 * (360 - 84)/360 = 713,000 ; total paid = 31,000 * 7.
     const r = calculateSellerFinanceOffer(50000, 1000000);
-    expect(r.balloonBalance).toBeCloseTo(696133.33, 1);
-    expect(r.totalPaymentsToBalloon).toBeCloseTo(211866.67, 1);
+    expect(r.balloonBalance).toBeCloseTo(713000, 1);
+    expect(r.totalPaymentsToBalloon).toBeCloseTo(217000, 1);
   });
 
   it("floors at min down and reports the achievable COCR when interest drags the deal below target", () => {
@@ -64,6 +64,6 @@ describe("calculateSellerFinanceOffer", () => {
   });
 
   it("defaults the ceiling to the business constant", () => {
-    expect(BUSINESS_CONSTANTS.SELLER_FINANCE_MAX_DOWN_PERCENT).toBe(9.2);
+    expect(BUSINESS_CONSTANTS.SELLER_FINANCE_MAX_DOWN_PERCENT).toBe(7);
   });
 });
