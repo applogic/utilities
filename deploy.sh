@@ -113,7 +113,7 @@ fi
 # nothing build/test-related can fail after the version has been bumped.
 echo "Bumping $RELEASE_TYPE version and publishing..."
 npm version "$RELEASE_TYPE"
-npm publish --access public --ignore-scripts
+npm publish --access public --ignore-scripts --auth-type=web
 git push
 git push --tags
 
