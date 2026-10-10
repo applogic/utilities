@@ -76,53 +76,20 @@ export function calculatePriceForCOCR(noi, targetCOCR = 0.15, options = {}) {
     downPercent = FINANCIAL_CONSTANTS.DEFAULT_DOWN_PAYMENT * 100,
     dscrLtvPercent = FINANCIAL_CONSTANTS.DEFAULT_DSCR_PERCENTAGE * 100,
     dscrRate = DEFAULT_TIER.rate,
-    dscrTerm = DEFAULT_TIER.amortization,
-    maxIterations = BUSINESS_CONSTANTS.MAX_ITERATIONS,
-    tolerance = BUSINESS_CONSTANTS.CALCULATION_TOLERANCE
+    dscrTerm = DEFAULT_TIER.amortization
   } = options;
 
-  try {
-    let targetPrice = noi / 0.08; // Initial estimate: NOI / 8% cap rate
-    let iterations = 0;
-    
-    while (iterations < maxIterations) {
-      const cashInvested = targetPrice * (downPercent / 100);
-      const dscrLoanAmount = targetPrice * (dscrLtvPercent / 100);
-      const dscrPayment = calculatePMT(dscrLoanAmount, dscrRate, dscrTerm) * 12;
-      const annualCashFlow = noi - dscrPayment;
-      const currentCOCR = annualCashFlow / cashInvested;
-      
-      if (Math.abs(currentCOCR - targetCOCR) < tolerance) {
-        break;
-      }
-      
-      const error = currentCOCR - targetCOCR;
-      const adjustment = error * BUSINESS_CONSTANTS.ADJUSTMENT_FACTOR;
-      
-      if (error > 0) {
-        targetPrice = targetPrice * (1 + Math.abs(adjustment));
-      } else {
-        targetPrice = targetPrice * (1 - Math.abs(adjustment));
-      }
-      
-      // Reasonable bounds during iteration (prevent extreme values)
-      if (targetPrice < 1000) targetPrice = 1000;
-      if (targetPrice > noi * BUSINESS_CONSTANTS.MAX_COCR15_PRICE_MULTIPLIER) {
-        targetPrice = noi * BUSINESS_CONSTANTS.CONSERVATIVE_COCR15_PRICE_MULTIPLIER;
-      }
-      
-      iterations++;
-    }
-    
-    // Apply final bounds check AFTER iteration
-    if (targetPrice < BUSINESS_CONSTANTS.MINIMUM_COCR15_PRICE) {
-      targetPrice = BUSINESS_CONSTANTS.MINIMUM_COCR15_PRICE;
-    }
-    
-    return targetPrice;
-  } catch (error) {
-    return 0;
+  const noiNum = Number(noi);
+  if (!Number.isFinite(noiNum)) return 0;
+
+  const annualLoanConstant = calculatePMT(1, dscrRate, dscrTerm) * 12;
+  const requiredCapRate = (dscrLtvPercent / 100) * annualLoanConstant + (downPercent / 100) * targetCOCR;
+  const targetPrice = noiNum / requiredCapRate;
+
+  if (!Number.isFinite(targetPrice) || targetPrice < BUSINESS_CONSTANTS.MINIMUM_COCR15_PRICE) {
+    return BUSINESS_CONSTANTS.MINIMUM_COCR15_PRICE;
   }
+  return targetPrice;
 }
 
 /**
@@ -332,6 +299,73 @@ export function calculateCashOfferPrice(
   // Round to whole dollars first so binary-float noise (e.g. 929999.9999) can't
   // knock the value down a whole step, then floor to the step.
   return Math.floor(Math.round(haircutPrice) / roundingStep) * roundingStep;
+}
+
+/**
+ * Closed-form breakdown of the all-cash offer price, for showing the underwriting math.
+ * The supported price is the one at which NOI exactly covers DSCR debt service on the
+ * loan share plus the target COCR on the down payment:
+ *   price = NOI / (loanShare x annualLoanConstant + downShare x targetCOCR)
+ * The offer is that price less the acquisition-cost haircut, floored to the rounding step.
+ * @param {number} noi - Net Operating Income (annual)
+ * @param {Object} options - dscrRate (decimal), dscrTerm (years), downPercent, targetCOCR, assignmentPercent, roundingStep
+ * @returns {Object|null} Every figure in the derivation, or null when NOI is not a positive number
+ */
+export function calculateCashPriceBreakdown(noi, options = {}) {
+  const {
+    assignmentPercent = BUSINESS_CONSTANTS.CASH_OFFER_ASSIGNMENT_PERCENTAGE,
+    downPercent = FINANCIAL_CONSTANTS.DEFAULT_DOWN_PAYMENT * 100,
+    dscrRate = DEFAULT_TIER.rate,
+    dscrTerm = DEFAULT_TIER.amortization,
+    roundingStep = BUSINESS_CONSTANTS.CASH_OFFER_ROUNDING,
+    targetCOCR = 0.15
+  } = options;
+
+  const noiNum = Number(noi);
+  if (!Number.isFinite(noiNum) || noiNum <= 0) return null;
+
+  const downShare = downPercent / 100;
+  const loanShare = 1 - downShare;
+  const annualLoanConstant = calculatePMT(1, dscrRate, dscrTerm) * 12;
+  const debtServiceFactor = loanShare * annualLoanConstant;
+  const returnFactor = downShare * targetCOCR;
+  const totalFactor = debtServiceFactor + returnFactor;
+  const supportedPrice = calculatePriceForCOCR(noiNum, targetCOCR, {
+    downPercent,
+    dscrLtvPercent: loanShare * 100,
+    dscrRate,
+    dscrTerm,
+  });
+  const downPayment = supportedPrice * downShare;
+  const loanAmount = supportedPrice * loanShare;
+  const debtService = loanAmount * annualLoanConstant;
+  const cashFlow = noiNum - debtService;
+  const acquisitionCosts = supportedPrice * assignmentPercent;
+  const netPrice = supportedPrice - acquisitionCosts;
+  const cashOfferPrice = calculateCashOfferPrice(supportedPrice, assignmentPercent, roundingStep);
+
+  return {
+    acquisitionCosts,
+    annualLoanConstant,
+    assignmentPercent,
+    cashFlow,
+    cashOfferPrice,
+    cocr: cashFlow / downPayment,
+    debtService,
+    debtServiceFactor,
+    downPayment,
+    downPercent,
+    dscrRate,
+    dscrTerm,
+    loanAmount,
+    loanPercent: 100 - downPercent,
+    netPrice,
+    noi: noiNum,
+    returnFactor,
+    supportedPrice,
+    targetCOCR,
+    totalFactor,
+  };
 }
 
 /**

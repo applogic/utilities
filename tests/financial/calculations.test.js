@@ -10,6 +10,7 @@ import {
   calculateSTRNOI,
   calculateAssignmentFee,
   calculateCashOfferPrice,
+  calculateCashPriceBreakdown,
   calculateNetToBuyer
 } from "../../src/financial/calculations.js";
 
@@ -78,12 +79,13 @@ describe("Financial Calculations", () => {
 
 describe("Core Financial Calculations", () => {
   describe("calculatePriceForCOCR", () => {
-    test("should calculate price for 15% COCR target using config defaults", () => {
-      const noi = 50000;
-      const result = calculatePriceForCOCR(noi, 0.15);
-      
-      expect(result).toBeGreaterThan(400000);
-      expect(result).toBeLessThan(600000);
+    test("returns the exact price at which COCR is 15.00%, not an approximation", () => {
+      const noi = 395576;
+      const price = calculatePriceForCOCR(noi, 0.15, { dscrRate: 0.10, dscrTerm: 30 });
+      const cocr = (noi - calculatePMT(price * 0.70, 0.10, 30) * 12) / (price * 0.30);
+
+      expect(cocr).toBeCloseTo(0.15, 10);
+      expect(price).toBeCloseTo(3332120, -1);
     });
 
     test("should respect business constants for bounds", () => {
@@ -286,6 +288,46 @@ describe("Core Financial Calculations", () => {
       expect(calculateCashOfferPrice(null)).toBeNull();
       expect(calculateCashOfferPrice(undefined)).toBeNull();
       expect(calculateCashOfferPrice("abc")).toBeNull();
+    });
+  });
+
+  describe("calculateCashPriceBreakdown", () => {
+    const commercial = { dscrRate: 0.10, dscrTerm: 25 };
+
+    test("hits the target COCR exactly so the math shown to a seller reconciles", () => {
+      const b = calculateCashPriceBreakdown(100000, commercial);
+      expect(b.cocr).toBeCloseTo(0.15, 10);
+      expect(b.cashFlow).toBeCloseTo(b.downPayment * 0.15, 6);
+      expect(b.debtService + b.cashFlow).toBeCloseTo(100000, 6);
+    });
+
+    test("NOI 100,000 at 10% / 25yr / 30% down supports ~824,193 and offers 760,000", () => {
+      const b = calculateCashPriceBreakdown(100000, commercial);
+      expect(b.annualLoanConstant).toBeCloseTo(0.10904, 5);
+      expect(b.totalFactor).toBeCloseTo(0.12133, 5);
+      expect(b.supportedPrice).toBeCloseTo(824193, -2);
+      expect(b.cashOfferPrice).toBe(760000);
+    });
+
+    test("acquisition costs are the 7% haircut and the offer floors from the net price", () => {
+      const b = calculateCashPriceBreakdown(100000, commercial);
+      expect(b.acquisitionCosts).toBeCloseTo(b.supportedPrice * 0.07, 6);
+      expect(b.netPrice + b.acquisitionCosts).toBeCloseTo(b.supportedPrice, 6);
+      expect(b.cashOfferPrice).toBe(calculateCashOfferPrice(b.supportedPrice));
+      expect(b.cashOfferPrice).toBeLessThanOrEqual(b.netPrice);
+    });
+
+    test("uses the property's own rate tier, so a cheaper loan supports a higher price", () => {
+      const commercialPrice = calculateCashPriceBreakdown(100000, commercial).supportedPrice;
+      const residentialPrice = calculateCashPriceBreakdown(100000, { dscrRate: 0.08, dscrTerm: 30 }).supportedPrice;
+      expect(residentialPrice).toBeGreaterThan(commercialPrice);
+    });
+
+    test("returns null for non-positive or non-numeric NOI", () => {
+      expect(calculateCashPriceBreakdown(0)).toBeNull();
+      expect(calculateCashPriceBreakdown(-5)).toBeNull();
+      expect(calculateCashPriceBreakdown(null)).toBeNull();
+      expect(calculateCashPriceBreakdown("abc")).toBeNull();
     });
   });
 

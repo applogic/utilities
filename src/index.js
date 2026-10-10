@@ -12,6 +12,7 @@ export {
   calculateCashFlowYield,
   calculateCashOfferPrice,
   calculateCashOutAfterRefi,
+  calculateCashPriceBreakdown,
   calculateCOCR30, 
   calculateCOCRAtPercent,
   calculateDiscountFromPrice,
