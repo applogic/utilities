@@ -1,8 +1,8 @@
 // src/financial/calculations.js
 
-import { FINANCIAL_CONSTANTS } from '../config/financial.js';
-import { BUSINESS_CONSTANTS } from '../config/business.js';
-import { PROPERTY_TYPE_CONSTANTS, PROPERTY_TYPES } from '../config/property-types.js';
+import { FINANCIAL_CONSTANTS } from "../config/financial.js";
+import { BUSINESS_CONSTANTS } from "../config/business.js";
+import { PROPERTY_TYPE_CONSTANTS, PROPERTY_TYPES } from "../config/property-types.js";
 
 const DEFAULT_TIER = FINANCIAL_CONSTANTS.INTEREST_RATE_TIERS[FINANCIAL_CONSTANTS.DEFAULT_INTEREST_RATE_TYPE];
 
