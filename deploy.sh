@@ -17,12 +17,16 @@ RELEASE_TYPE="none"
 SKIP_TESTS=false
 ASSUME_YES=false
 NO_PROPAGATE=false
+PROPAGATE_ONLY=false
 
 # Parse arguments
 for arg in "$@"; do
   case $arg in
     patch|minor|major)
       RELEASE_TYPE=$arg
+      ;;
+    --propagate-only)
+      PROPAGATE_ONLY=true
       ;;
     --skip-tests)
       SKIP_TESTS=true
@@ -36,15 +40,17 @@ for arg in "$@"; do
     *)
       echo "Invalid argument: $arg"
       echo "Usage: ./deploy.sh [patch|minor|major] [--skip-tests] [-y|--yes] [--no-propagate]"
+      echo "       ./deploy.sh --propagate-only [-y|--yes]"
       exit 1
       ;;
   esac
 done
 
 # Validate release type
-if [[ "$RELEASE_TYPE" != "patch" && "$RELEASE_TYPE" != "minor" && "$RELEASE_TYPE" != "major" ]]; then
+if [[ "$PROPAGATE_ONLY" = false && "$RELEASE_TYPE" != "patch" && "$RELEASE_TYPE" != "minor" && "$RELEASE_TYPE" != "major" ]]; then
   echo "Missing or invalid release type."
   echo "Usage: ./deploy.sh [patch|minor|major] [--skip-tests] [-y|--yes] [--no-propagate]"
+  echo "       ./deploy.sh --propagate-only [-y|--yes]"
   exit 1
 fi
 
@@ -96,34 +102,53 @@ fi
 # hook re-ran build/test AFTER `npm version` had already bumped — so a failure
 # there left the version bumped but unpublished. Running them here first means
 # a broken build/test exits with the version number untouched, ready to fix.
-echo "Cleaning and building..."
-npm run clean
-npm run build
+if [ "$PROPAGATE_ONLY" = false ]; then
+  echo "Cleaning and building..."
+  npm run clean
+  npm run build
 
-if [ "$SKIP_TESTS" = false ]; then
-  echo "Running tests..."
-  npm test
-  echo "All tests passed!"
-else
-  echo "Skipping tests due to --skip-tests flag."
+  if [ "$SKIP_TESTS" = false ]; then
+    echo "Running tests..."
+    npm test
+    echo "All tests passed!"
+  else
+    echo "Skipping tests due to --skip-tests flag."
+  fi
+
+  # Build + tests passed — now it is safe to bump, publish, and push.
+  # --ignore-scripts skips the prepublishOnly re-build/re-test we just ran, so
+  # nothing build/test-related can fail after the version has been bumped.
+  echo "Bumping $RELEASE_TYPE version and publishing..."
+  npm version "$RELEASE_TYPE"
+  npm publish --access public --ignore-scripts --auth-type=web
+  git push
+  git push --tags
+
+  echo "Deployment completed successfully!"
 fi
-
-# Build + tests passed — now it is safe to bump, publish, and push.
-# --ignore-scripts skips the prepublishOnly re-build/re-test we just ran, so
-# nothing build/test-related can fail after the version has been bumped.
-echo "Bumping $RELEASE_TYPE version and publishing..."
-npm version "$RELEASE_TYPE"
-npm publish --access public --ignore-scripts --auth-type=web
-git push
-git push --tags
-
-echo "Deployment completed successfully!"
 
 # Propagate the freshly published version to consumer repos.
 if [ "$BUMP_CONSUMERS" = true ]; then
   NEW_VERSION="$(node -p "require('./package.json').version")"
   echo ""
   echo "════════ Propagating @archerjessop/utilities@${NEW_VERSION} ════════"
+
+  echo "Waiting for @archerjessop/utilities@${NEW_VERSION} to become available on npm (up to 15 min)..."
+  AVAILABLE=false
+  for attempt in $(seq 1 60); do
+    TARBALL="$(npm view "@archerjessop/utilities@${NEW_VERSION}" dist.tarball --prefer-online 2>/dev/null)"
+    if [ -n "$TARBALL" ] && [ "$(curl -s -o /dev/null -w "%{http_code}" "$TARBALL")" = "200" ]; then
+      AVAILABLE=true
+      echo "  ✓ available on npm (check ${attempt})"
+      break
+    fi
+    sleep 15
+  done
+  if [ "$AVAILABLE" = false ]; then
+    echo "  ✗ @archerjessop/utilities@${NEW_VERSION} still not on npm after 15 min — no consumers touched."
+    echo "  Re-run later with: bash deploy.sh --propagate-only -y"
+    exit 1
+  fi
 
   # Bump one consumer to the exact published version, commit, push, and run its
   # local deploy.sh unless it is server-managed (PM2 / server path) — in which
@@ -173,6 +198,7 @@ if [ "$BUMP_CONSUMERS" = true ]; then
   }
 
   set +e
+  trap - ERR
   RESULTS=()
   FAILED=0
   for c in "${CONSUMERS[@]}"; do
@@ -186,6 +212,7 @@ if [ "$BUMP_CONSUMERS" = true ]; then
     echo ""
   done
   set -e
+  trap 'handle_error $LINENO' ERR
 
   echo "════════ Consumer summary (@${NEW_VERSION}) ════════"
   printf '%s\n' "${RESULTS[@]}"
