@@ -1,6 +1,6 @@
 {
   "name": "@archerjessop/utilities",
-  "version": "7.37.0",
+  "version": "7.38.0",
   "description": "Shared utilities for ArcherJessop property analysis tools",
   "type": "module",
   "main": "dist/index.js",
