@@ -136,7 +136,7 @@ if [ "$BUMP_CONSUMERS" = true ]; then
   echo "Waiting for @archerjessop/utilities@${NEW_VERSION} to become available on npm (up to 15 min)..."
   AVAILABLE=false
   for attempt in $(seq 1 60); do
-    TARBALL="$(npm view "@archerjessop/utilities@${NEW_VERSION}" dist.tarball --prefer-online 2>/dev/null)"
+    TARBALL="$(npm view "@archerjessop/utilities@${NEW_VERSION}" dist.tarball --prefer-online 2>/dev/null || true)"
     if [ -n "$TARBALL" ] && [ "$(curl -s -o /dev/null -w "%{http_code}" "$TARBALL")" = "200" ]; then
       AVAILABLE=true
       echo "  ✓ available on npm (check ${attempt})"
